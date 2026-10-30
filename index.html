@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Sport Tournament & Reverse-Time Planner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Montserrat', sans-serif; background-color: #f4f6f9; color: #1e293b; }
+    .navy-bg { background-color: #004587; }
+    .gold-bg { background-color: #fbba07; }
+    .red-bg  { background-color: #e73037; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- TOP HEADER -->
+  <header class="navy-bg text-white shadow-lg border-b-4 border-[#fbba07]">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🏆</span>
+        <div>
+          <h1 id="headerTitle" class="text-xl font-black tracking-wider uppercase leading-none">Tournament Planner</h1>
+          <p id="headerSubtitle" class="text-xs text-[#fbba07] font-bold tracking-widest uppercase mt-0.5">4–12 Teams • 1–6 Courts • Auto-Adjusted Game Clock</p>
+        </div>
+      </div>
+
+      <!-- Live Game Duration Pill & Backup Controls -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div id="clockBadge" class="gold-bg text-slate-900 font-extrabold text-xs px-3 py-1.5 rounded-lg uppercase tracking-wider">
+          ⏱️ GAME CLOCK: -- MINS
+        </div>
+
+        <button onclick="exportJson()" class="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+          💾 Export
+        </button>
+        <label class="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
+          📂 Import <input type="file" accept=".json" onchange="importJson(event)" class="hidden" />
+        </label>
+        <button onclick="confirmReset()" class="red-bg hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+          ⚠️ Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- NAVIGATION TABS -->
+    <div class="max-w-7xl mx-auto px-4 flex gap-2 pt-2">
+      <button onclick="switchTab('SETUP')" id="tab-SETUP" class="tab-btn px-5 py-2.5 rounded-t-lg font-extrabold text-xs uppercase tracking-wider">
+        1. Setup & Target Finish Time
+      </button>
+      <button onclick="switchTab('COURTS')" id="tab-COURTS" class="tab-btn px-5 py-2.5 rounded-t-lg font-extrabold text-xs uppercase tracking-wider">
+        2. Live Courts & Schedule
+      </button>
+      <button onclick="switchTab('STANDINGS')" id="tab-STANDINGS" class="tab-btn px-5 py-2.5 rounded-t-lg font-extrabold text-xs uppercase tracking-wider">
+        3. Standings Table
+      </button>
+      <button onclick="switchTab('BRACKET')" id="tab-BRACKET" class="tab-btn px-5 py-2.5 rounded-t-lg font-extrabold text-xs uppercase tracking-wider">
+        4. Finals Bracket
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="max-w-7xl w-full mx-auto p-4 flex-1">
+
+    <!-- ==========================================
+         TAB 1: SETUP & REVERSE-TIME CALCULATOR
+         ========================================== -->
+    <section id="view-SETUP" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left 2 Cols: Tournament & Time Parameters -->
+        <div class="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-5">
+          <div class="border-b border-slate-200 pb-3">
+            <h2 class="text-lg font-black text-[#004587] uppercase">1. Tournament & Finish-Time Configuration</h2>
+            <p class="text-xs text-slate-500">Set your start and finish times; the engine automatically calculates the exact match length so you finish on the dot.</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Tournament Name</label>
+              <input id="cfgTitle" type="text" oninput="updateConfigFromUI()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Sport / Event</label>
+              <input id="cfgSport" type="text" oninput="updateConfigFromUI()" placeholder="e.g. Volleyball, Football, Basketball" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Number of Teams (4 to 12)</label>
+              <select id="cfgNumTeams" onchange="handleTeamCountChange(this.value)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-black text-[#004587]">
+                <option value="4">4 Teams</option>
+                <option value="5">5 Teams</option>
+                <option value="6">6 Teams</option>
+                <option value="7">7 Teams</option>
+                <option value="8">8 Teams</option>
+                <option value="9">9 Teams</option>
+                <option value="10">10 Teams</option>
+                <option value="11">11 Teams</option>
+                <option value="12">12 Teams</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Available Courts / Pitches (1 to 6)</label>
+              <select id="cfgNumCourts" onchange="updateConfigFromUI()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-black text-[#004587]">
+                <option value="1">1 Court / Pitch</option>
+                <option value="2">2 Courts / Pitches</option>
+                <option value="3">3 Courts / Pitches</option>
+                <option value="4">4 Courts / Pitches</option>
+                <option value="5">5 Courts / Pitches</option>
+                <option value="6">6 Courts / Pitches</option>
+              </select>
+            </div>
+
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Tournament Format</label>
+              <select id="cfgFormat" onchange="updateConfigFromUI()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold">
+                <option value="SINGLE_RR_FINALS">Single All-Play-All League + Semifinals & Finals (Best for 4–8 Teams)</option>
+                <option value="TWO_POOLS_FINALS">2 Pools (Pool A & Pool B) + Cross-Semifinals & Finals (Faster for 6–12 Teams)</option>
+              </select>
+            </div>
+
+            <!-- TIME WINDOW CONTROLS -->
+            <div class="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200">
+              <label class="block text-xs font-extrabold text-[#004587] uppercase mb-1">🕘 Start Time</label>
+              <input id="cfgStartTime" type="time" onchange="updateConfigFromUI()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-base font-black bg-white" />
+            </div>
+
+            <div class="bg-amber-50/80 p-3.5 rounded-xl border border-[#fbba07]">
+              <label class="block text-xs font-extrabold text-slate-900 uppercase mb-1">🏁 Target Finish Time</label>
+              <input id="cfgEndTime" type="time" onchange="updateConfigFromUI()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-base font-black bg-white" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Changeover Buffer Between Games (Mins)</label>
+              <input id="cfgBuffer" type="number" min="0" max="20" onchange="updateConfigFromUI()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold" />
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Win Pts</label>
+                <input id="cfgPtsWin" type="number" onchange="updateConfigFromUI()" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm font-bold text-center" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Draw Pts</label>
+                <input id="cfgPtsDraw" type="number" onchange="updateConfigFromUI()" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm font-bold text-center" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Loss Pts</label>
+                <input id="cfgPtsLoss" type="number" onchange="updateConfigFromUI()" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm font-bold text-center" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Col: Live Reverse-Time Calculator Preview Card -->
+        <div class="bg-white rounded-xl shadow-md border-2 border-[#004587] overflow-hidden flex flex-col justify-between">
+          <div>
+            <div class="navy-bg text-white px-5 py-3">
+              <h3 class="font-black text-sm uppercase tracking-wider">⏱️ Live Time-Budget Breakdown</h3>
+              <p class="text-[11px] text-[#fbba07] font-semibold">Auto-adjusts as you change teams, courts, or finish time</p>
+            </div>
+            <div id="timePreviewBox" class="p-5 space-y-4"></div>
+          </div>
+
+          <div class="p-5 pt-0">
+            <button onclick="lockAndGenerateSchedule()" class="w-full gold-bg hover:bg-amber-400 text-slate-900 font-black text-sm py-3.5 px-4 rounded-xl shadow-md uppercase tracking-wider">
+              🚀 Lock Setup & Build Timetable →
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TEAM NAMES EDITOR -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-black text-[#004587] uppercase">2. Customize Team Names</h3>
+            <p class="text-xs text-slate-500">Edit team/house/school names below before generating the schedule.</p>
+          </div>
+        </div>
+        <div id="teamNamesGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 2: LIVE COURTS & TIMETABLE
+         ========================================== -->
+    <section id="view-COURTS" class="hidden space-y-6">
+      <!-- Top Control & Delay Recalculator Bar -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+        <div id="stageProgressionControls" class="flex flex-wrap items-center gap-3"></div>
+
+        <!-- Live Running-Behind Recalculator -->
+        <div class="flex flex-wrap items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+          <span class="text-xs font-bold text-slate-600">⏳ Running late? Current Time:</span>
+          <input id="recalcTimeInput" type="time" class="border border-slate-300 rounded px-2 py-1 text-xs font-black" />
+          <button onclick="handleLiveRecalc()" class="navy-bg hover:bg-blue-900 text-white text-xs font-bold px-3 py-1.5 rounded">
+            Recalculate Game Lengths to Finish at <span id="targetEndSpan"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- LEFT 2 COLS: ACTIVE TIME SLOT ON COURTS -->
+        <div class="lg:col-span-2 space-y-4">
+          <div class="bg-white rounded-xl shadow-md border-2 border-[#004587] overflow-hidden">
+            <div class="navy-bg text-white px-5 py-3 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="inline-block w-3 h-3 rounded-full bg-green-400 animate-pulse"></span>
+                <h3 id="activeSlotHeader" class="font-black text-base uppercase tracking-wider">ON COURTS NOW</h3>
+              </div>
+              <span id="activeSlotTimeBadge" class="gold-bg text-slate-900 px-3 py-1 rounded font-black text-xs"></span>
+            </div>
+
+            <div id="activeCourtsGrid" class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          </div>
+
+          <!-- NEXT UP (ON DECK SLOT) -->
+          <div class="bg-white rounded-xl shadow-sm border-2 border-[#fbba07] overflow-hidden">
+            <div class="gold-bg text-slate-900 px-4 py-2 flex items-center justify-between">
+              <h4 class="font-black text-xs uppercase tracking-wider">⏳ ON DECK — NEXT TIME SLOT</h4>
+              <span id="nextSlotTimeBadge" class="font-extrabold text-xs"></span>
+            </div>
+            <div id="nextSlotMatchesList" class="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT COL: FULL MASTER TIMETABLE -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+          <div class="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
+            <h3 class="font-black text-xs uppercase tracking-wider">📋 Master Timetable</h3>
+            <span id="slotsCompletedCounter" class="text-xs font-bold text-[#fbba07]"></span>
+          </div>
+          <div id="masterTimetableList" class="divide-y divide-slate-100 max-h-[540px] overflow-y-auto text-xs"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 3: STANDINGS TABLE
+         ========================================== -->
+    <section id="view-STANDINGS" class="hidden space-y-6">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-black text-[#004587] uppercase">Live Standings & Qualification</h2>
+          <p class="text-xs text-slate-500">Sorted automatically by Points ➔ Goal/Point Difference (GD) ➔ Goals/Points For (GF).</p>
+        </div>
+      </div>
+      <div id="standingsTablesContainer" class="grid grid-cols-1 gap-6"></div>
+    </section>
+
+    <!-- ==========================================
+         TAB 4: FINALS BRACKET
+         ========================================== -->
+    <section id="view-BRACKET" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-black text-[#004587] uppercase">Championship Finals Bracket</h2>
+          <p class="text-xs text-slate-500">Semifinals ➔ 3rd Place Bronze Match & Championship Grand Final</p>
+        </div>
+      </div>
+      <div id="finalsBracketContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    </section>
+
+  </main>
+
+  <script src="tournament-engine.js"></script>
+  <script>
+    const engine = new TournamentEngine();
+    let currentTab = 'SETUP';
+
+    function initApp() {
+      syncSetupInputsFromState();
+      const now = new Date();
+      document.getElementById('recalcTimeInput').value =
+        `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      if (engine.state.stage !== 'SETUP' && engine.state.slots.length > 0) {
+        switchTab('COURTS');
+      } else {
+        switchTab('SETUP');
+      }
+      renderAll();
+    }
+
+    function switchTab(tabId) {
+      currentTab = tabId;
+      ['SETUP', 'COURTS', 'STANDINGS', 'BRACKET'].forEach(id => {
+        const view = document.getElementById(`view-${id}`);
+        const btn = document.getElementById(`tab-${id}`);
+        if (id === tabId) {
+          view.classList.remove('hidden');
+          btn.className = 'tab-btn px-5 py-2.5 rounded-t-lg font-extrabold text-xs uppercase tracking-wider bg-[#f4f6f9] text-[#004587]';
+        } else {
+          view.classList.add('hidden');
+          btn.className = 'tab-btn px-5 py-2.5 rounded-t-lg font-extrabold text-xs uppercase tracking-wider bg-blue-950/60 text-blue-200 hover:bg-blue-900';
+        }
+      });
+      renderAll();
+    }
+
+    function syncSetupInputsFromState() {
+      const c = engine.state.config;
+      document.getElementById('cfgTitle').value = c.title;
+      document.getElementById('cfgSport').value = c.sport;
+      document.getElementById('cfgNumTeams').value = engine.state.teams.length;
+      document.getElementById('cfgNumCourts').value = c.numCourts;
+      document.getElementById('cfgFormat').value = c.format;
+      document.getElementById('cfgStartTime').value = c.startTime;
+      document.getElementById('cfgEndTime').value = c.endTime;
+      document.getElementById('cfgBuffer').value = c.bufferMins;
+      document.getElementById('cfgPtsWin').value = c.ptsWin;
+      document.getElementById('cfgPtsDraw').value = c.ptsDraw;
+      document.getElementById('cfgPtsLoss').value = c.ptsLoss;
+    }
+
+    function updateConfigFromUI() {
+      const c = engine.state.config;
+      c.title = document.getElementById('cfgTitle').value;
+      c.sport = document.getElementById('cfgSport').value;
+      c.numCourts = Number(document.getElementById('cfgNumCourts').value);
+      c.format = document.getElementById('cfgFormat').value;
+      c.startTime = document.getElementById('cfgStartTime').value;
+      c.endTime = document.getElementById('cfgEndTime').value;
+      c.bufferMins = Number(document.getElementById('cfgBuffer').value);
+      c.ptsWin = Number(document.getElementById('cfgPtsWin').value);
+      c.ptsDraw = Number(document.getElementById('cfgPtsDraw').value);
+      c.ptsLoss = Number(document.getElementById('cfgPtsLoss').value);
+
+      engine.setTeamCount(engine.state.teams.length);
+      engine.saveState();
+      renderSetup();
+      updateHeaderBadges();
+    }
+
+    function handleTeamCountChange(val) {
+      engine.setTeamCount(Number(val));
+      renderSetup();
+    }
+
+    function updateTeamName(idx, val) {
+      engine.state.teams[idx].name = val;
+      engine.saveState();
+    }
+
+    function lockAndGenerateSchedule() {
+      const preview = engine.previewTimingMetrics();
+      if (preview.totalAvailableMins <= 0) {
+        alert('Target Finish Time must be later than Start Time.');
+        return;
+      }
+      engine.startTournament();
+      switchTab('COURTS');
+    }
+
+    function updateHeaderBadges() {
+      document.getElementById('headerTitle').textContent = engine.state.config.title || 'Tournament Planner';
+      document.getElementById('headerSubtitle').textContent =
+        `${engine.state.config.sport} • ${engine.state.teams.length} Teams • ${engine.state.config.numCourts} Court(s) • Ends ${engine.state.config.endTime}`;
+      const preview = engine.previewTimingMetrics();
+      const mins = engine.state.stage === 'SETUP' ? preview.gameDurationMins : engine.state.scheduleStats.gameDurationMins;
+      document.getElementById('clockBadge').textContent =
+        `⏱️ ${mins} MIN GAMES (+${engine.state.config.bufferMins}M BUFFER)`;
+      document.getElementById('targetEndSpan').textContent = engine.state.config.endTime;
+    }
+
+    function renderAll() {
+      updateHeaderBadges();
+      renderSetup();
+      renderCourts();
+      renderStandings();
+      renderBracket();
+    }
+
+    // ==========================================
+    // TAB 1: RENDER SETUP & TIME PREVIEW
+    // ==========================================
+    function renderSetup() {
+      const p = engine.previewTimingMetrics();
+      const box = document.getElementById('timePreviewBox');
+
+      box.innerHTML = `
+        <div class="bg-slate-900 text-white p-4 rounded-xl text-center">
+          <div class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Calculated Match Duration</div>
+          <div class="text-4xl font-black text-[#fbba07] my-1">${p.gameDurationMins} <span class="text-lg">mins</span></div>
+          <div class="text-xs text-slate-300">+ ${engine.state.config.bufferMins} min changeover buffer per slot</div>
+        </div>
+
+        ${p.warning ? `
+          <div class="bg-red-50 border border-red-200 text-[#e73037] p-3 rounded-lg text-xs font-bold">
+            ⚠️ ${p.warning}
+          </div>
+        ` : ''}
+
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500 font-semibold">Total Time Window:</span>
+            <span class="font-black text-slate-800">${engine.state.config.startTime} ➔ ${engine.state.config.endTime} (${p.totalAvailableMins} mins)</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500 font-semibold">Total Matches to Play:</span>
+            <span class="font-black text-slate-800">${p.totalMatches} Games (${p.groupMatchesCount} Group + 4 Knockout)</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500 font-semibold">Sequential Time Slots Needed:</span>
+            <span class="font-black text-[#004587]">${p.totalSlots} Slots (${p.groupSlots} Group + ${p.knockoutSlots} Finals)</span>
+          </div>
+          <div class="flex justify-between py-1.5">
+            <span class="text-slate-500 font-semibold">Cycle Time per Slot:</span>
+            <span class="font-black text-slate-800">${p.slotDurationMins} mins / slot</span>
+          </div>
+        </div>
+      `;
+
+      const grid = document.getElementById('teamNamesGrid');
+      grid.innerHTML = engine.state.teams.map((t, idx) => `
+        <div class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+          <span class="navy-bg text-white font-black text-xs px-2 py-1 rounded">${t.id}</span>
+          <input
+            type="text"
+            value="${t.name}"
+            oninput="updateTeamName(${idx}, this.value)"
+            class="w-full bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-bold focus:outline-none focus:border-[#004587]"
+          />
+          <span class="text-[10px] font-extrabold text-slate-400 uppercase shrink-0">${t.pool}</span>
+        </div>
+      `).join('');
+    }
+
+    // ==========================================
+    // TAB 2: LIVE COURTS & MASTER TIMETABLE
+    // ==========================================
+    function selectSlot(slotNum) {
+      engine.state.activeSlotNumber = slotNum;
+      engine.saveState();
+      renderCourts();
+    }
+
+    function saveScoreFromInput(matchId) {
+      const sA = document.getElementById(`scoreA_${matchId}`).value;
+      const sB = document.getElementById(`scoreB_${matchId}`).value;
+      if (sA === '' || sB === '') {
+        alert('Enter scores for both teams.');
+        return;
+      }
+      engine.recordMatchScore(matchId, Number(sA), Number(sB));
+      renderAll();
+    }
+
+    function simulateRemainingGroupMatches() {
+      engine.state.slots.forEach(s => {
+        if (s.stage === 'GROUP') {
+          s.matches.forEach(m => {
+            if (m.status !== 'COMPLETED') {
+              m.scoreA = Math.floor(Math.random() * 5);
+              m.scoreB = Math.floor(Math.random() * 5);
+              m.status = 'COMPLETED';
+            }
+          });
+        }
+      });
+      engine.saveState();
+      renderAll();
+    }
+
+    function handleLiveRecalc() {
+      const tVal = document.getElementById('recalcTimeInput').value;
+      if (!tVal) return;
+      engine.recalculateRemainingClock(tVal);
+      renderAll();
+    }
+
+    function renderCourts() {
+      if (engine.state.slots.length === 0) return;
+
+      // Check stage completion status for progression buttons
+      const groupMatches = [];
+      const semiMatches = [];
+      engine.state.slots.forEach(s => {
+        s.matches.forEach(m => {
+          if (m.stage === 'GROUP') groupMatches.push(m);
+          if (m.stage === 'SEMIFINALS') semiMatches.push(m);
+        });
+      });
+
+      const pendingGroup = groupMatches.filter(m => m.status !== 'COMPLETED').length;
+      const pendingSemis = semiMatches.filter(m => m.status !== 'COMPLETED').length;
+
+      const stageCtrl = document.getElementById('stageProgressionControls');
+      let actionHtml = '';
+      if (pendingGroup > 0) {
+        actionHtml = `
+          <span class="text-xs font-extrabold uppercase text-[#004587]">Group Stage (${groupMatches.length - pendingGroup}/${groupMatches.length} Played)</span>
+          <button onclick="simulateRemainingGroupMatches()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-300">
+            ⚡ Quick-Simulate Group Scores (Test)
+          </button>
+        `;
+      } else if (engine.state.stage === 'GROUP_STAGE') {
+        actionHtml = `
+          <button onclick="engine.seedSemifinals(); renderAll();" class="gold-bg hover:bg-amber-400 text-slate-900 font-black text-xs px-4 py-2 rounded-lg shadow uppercase">
+            🔥 Group Stage Complete! Seed Semifinals Now →
+          </button>
+        `;
+      } else if (engine.state.stage === 'SEMIFINALS' && pendingSemis === 0) {
+        actionHtml = `
+          <button onclick="engine.seedFinals(); renderAll();" class="gold-bg hover:bg-amber-400 text-slate-900 font-black text-xs px-4 py-2 rounded-lg shadow uppercase">
+            🏆 Semifinals Complete! Seed Grand Final & 3rd Place Match →
+          </button>
+        `;
+      } else {
+        actionHtml = `<span class="text-xs font-extrabold uppercase text-emerald-700">Stage: ${engine.state.stage}</span>`;
+      }
+      stageCtrl.innerHTML = actionHtml;
+
+      const activeSlot = engine.state.slots.find(s => s.slotNumber === engine.state.activeSlotNumber) || engine.state.slots[0];
+      document.getElementById('activeSlotHeader').textContent = `SLOT #${activeSlot.slotNumber} — ${activeSlot.stage} ON COURTS`;
+      document.getElementById('activeSlotTimeBadge').textContent = `🕒 ${activeSlot.startTime} – ${activeSlot.endTime} (${engine.state.scheduleStats.gameDurationMins}m)`;
+
+      const courtsGrid = document.getElementById('activeCourtsGrid');
+      courtsGrid.innerHTML = activeSlot.matches.map(m => {
+        const teamA = engine.getTeamName(m.teamAId);
+        const teamB = engine.getTeamName(m.teamBId);
+        const isDone = m.status === 'COMPLETED';
+
+        return `
+          <div class="p-4 rounded-xl border-2 ${isDone ? 'border-emerald-500 bg-emerald-50/30' : 'border-slate-200 bg-white'} flex flex-col justify-between space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="navy-bg text-white font-black text-xs px-2.5 py-1 rounded uppercase">COURT ${m.court}</span>
+              <span class="text-xs font-bold text-slate-500 uppercase">${m.group}</span>
+            </div>
+
+            <div class="grid grid-cols-7 items-center gap-2 my-2">
+              <div class="col-span-3 text-right">
+                <div class="font-extrabold text-sm text-slate-900 leading-tight">${teamA}</div>
+                <div class="text-[10px] font-bold text-slate-400">${m.teamAId}</div>
+              </div>
+              <div class="col-span-1 text-center font-black text-xs text-slate-400">VS</div>
+              <div class="col-span-3 text-left">
+                <div class="font-extrabold text-sm text-slate-900 leading-tight">${teamB}</div>
+                <div class="text-[10px] font-bold text-slate-400">${m.teamBId}</div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <input id="scoreA_${m.id}" type="number" min="0" value="${m.scoreA !== null ? m.scoreA : ''}" placeholder="0" class="w-14 border border-slate-300 rounded-lg py-1.5 text-center font-black text-sm" />
+                <span class="font-black text-slate-400">-</span>
+                <input id="scoreB_${m.id}" type="number" min="0" value="${m.scoreB !== null ? m.scoreB : ''}" placeholder="0" class="w-14 border border-slate-300 rounded-lg py-1.5 text-center font-black text-sm" />
+              </div>
+              <button onclick="saveScoreFromInput('${m.id}')" class="px-4 py-1.5 rounded-lg font-black text-xs uppercase ${isDone ? 'bg-emerald-600 text-white' : 'navy-bg hover:bg-blue-900 text-white'}">
+                ${isDone ? '✓ Saved (Update)' : 'Save Score'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Next Up Slot
+      const nextSlot = engine.state.slots.find(s => s.slotNumber === activeSlot.slotNumber + 1);
+      const nextList = document.getElementById('nextSlotMatchesList');
+      if (!nextSlot) {
+        document.getElementById('nextSlotTimeBadge').textContent = 'FINAL SLOT';
+        nextList.innerHTML = `<p class="text-slate-400 italic">No subsequent time slots.</p>`;
+      } else {
+        document.getElementById('nextSlotTimeBadge').textContent = `Slot #${nextSlot.slotNumber} (${nextSlot.startTime} – ${nextSlot.endTime})`;
+        nextList.innerHTML = nextSlot.matches.map(m => `
+          <div class="p-2.5 rounded bg-amber-50/70 border border-amber-200 flex items-center justify-between">
+            <span class="font-black text-[#004587]">Court ${m.court}:</span>
+            <span class="font-bold text-slate-800 truncate ml-2">${engine.getTeamName(m.teamAId)} vs ${engine.getTeamName(m.teamBId)}</span>
+          </div>
+        `).join('');
+      }
+
+      // Master Timetable Queue
+      const doneSlots = engine.state.slots.filter(s => s.matches.every(m => m.status === 'COMPLETED')).length;
+      document.getElementById('slotsCompletedCounter').textContent = `${doneSlots}/${engine.state.slots.length} Slots Done`;
+
+      document.getElementById('masterTimetableList').innerHTML = engine.state.slots.map(s => {
+        const allDone = s.matches.every(m => m.status === 'COMPLETED');
+        const isCurrent = s.slotNumber === activeSlot.slotNumber;
+        return `
+          <div onclick="selectSlot(${s.slotNumber})" class="p-3 cursor-pointer hover:bg-slate-50 ${isCurrent ? 'bg-blue-50/80 border-l-4 border-[#004587]' : ''}">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-black text-slate-900">Slot #${s.slotNumber} (${s.startTime}–${s.endTime})</span>
+              <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded ${allDone ? 'bg-green-100 text-green-800' : isCurrent ? 'gold-bg text-slate-900' : 'bg-slate-100 text-slate-600'}">
+                ${allDone ? 'Done' : s.stage}
+              </span>
+            </div>
+            <div class="space-y-1 text-[11px] text-slate-600">
+              ${s.matches.map(m => `
+                <div class="flex justify-between">
+                  <span><strong>C${m.court}:</strong> ${engine.getTeamName(m.teamAId)} vs ${engine.getTeamName(m.teamBId)}</span>
+                  <span class="font-black text-[#004587]">${m.status === 'COMPLETED' ? `${m.scoreA} - ${m.scoreB}` : ''}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // TAB 3: STANDINGS TABLE
+    // ==========================================
+    function renderStandings() {
+      const container = document.getElementById('standingsTablesContainer');
+      const groups = (engine.state.config.format === 'TWO_POOLS_FINALS' && engine.state.teams.length >= 6)
+        ? ['Pool A', 'Pool B']
+        : ['League'];
+
+      const cutoff = groups.length === 2 ? 2 : 4;
+
+      container.innerHTML = groups.map(gName => {
+        const rows = engine.getGroupStandings(gName);
+        return `
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="navy-bg text-white px-4 py-3 flex items-center justify-between">
+              <span class="font-black text-sm uppercase">${gName} Standings</span>
+              <span class="text-xs font-bold text-[#fbba07]">Top ${cutoff} Qualify for Semifinals</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 uppercase border-b border-slate-200">
+                  <tr>
+                    <th class="py-2.5 px-4">Pos</th>
+                    <th class="py-2.5 px-4">Team</th>
+                    <th class="py-2.5 px-3 text-center">P</th>
+                    <th class="py-2.5 px-3 text-center">W</th>
+                    <th class="py-2.5 px-3 text-center">D</th>
+                    <th class="py-2.5 px-3 text-center">L</th>
+                    <th class="py-2.5 px-3 text-center">GF</th>
+                    <th class="py-2.5 px-3 text-center">GA</th>
+                    <th class="py-2.5 px-3 text-center">GD</th>
+                    <th class="py-2.5 px-4 text-center">PTS</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${rows.map((r, idx) => {
+                    const qualifies = idx < cutoff;
+                    return `
+                      <tr class="${qualifies ? 'bg-green-50/60 font-bold' : ''}">
+                        <td class="py-2.5 px-4">${idx + 1} ${qualifies ? '✅' : ''}</td>
+                        <td class="py-2.5 px-4 font-extrabold text-slate-900">${r.teamName} <span class="text-slate-400 font-normal">(${r.teamId})</span></td>
+                        <td class="py-2.5 px-3 text-center">${r.played}</td>
+                        <td class="py-2.5 px-3 text-center text-emerald-700">${r.won}</td>
+                        <td class="py-2.5 px-3 text-center">${r.drawn}</td>
+                        <td class="py-2.5 px-3 text-center text-red-600">${r.lost}</td>
+                        <td class="py-2.5 px-3 text-center">${r.gf}</td>
+                        <td class="py-2.5 px-3 text-center">${r.ga}</td>
+                        <td class="py-2.5 px-3 text-center font-bold">${r.gd > 0 ? `+${r.gd}` : r.gd}</td>
+                        <td class="py-2.5 px-4 text-center font-black text-sm text-[#004587]">${r.pts}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // TAB 4: FINALS BRACKET
+    // ==========================================
+    function renderBracket() {
+      const container = document.getElementById('finalsBracketContainer');
+      const knockoutMatches = [];
+      engine.state.slots.forEach(s => {
+        s.matches.forEach(m => {
+          if (m.stage === 'SEMIFINALS' || m.stage === 'FINALS') {
+            knockoutMatches.push({ ...m, startTime: s.startTime, endTime: s.endTime });
+          }
+        });
+      });
+
+      const semis = knockoutMatches.filter(m => m.stage === 'SEMIFINALS');
+      const finals = knockoutMatches.filter(m => m.stage === 'FINALS');
+      const grandFinal = finals.find(m => m.id === 'GRAND_FINAL');
+
+      let champName = null;
+      if (grandFinal && grandFinal.status === 'COMPLETED') {
+        const champId = grandFinal.scoreA >= grandFinal.scoreB ? grandFinal.teamAId : grandFinal.teamBId;
+        champName = engine.getTeamName(champId);
+      }
+
+      const renderCard = m => `
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+          <div class="flex justify-between items-center text-[11px] font-bold text-slate-500 uppercase">
+            <span>${m.label || m.group}</span>
+            <span class="text-[#004587]">🕒 ${m.startTime} (Court ${m.court})</span>
+          </div>
+          <div class="flex justify-between items-center bg-white p-2.5 rounded border border-slate-200">
+            <span class="font-extrabold text-sm text-slate-900">${engine.getTeamName(m.teamAId)}</span>
+            <span class="font-black text-base text-[#004587]">${m.scoreA !== null ? m.scoreA : '-'}</span>
+          </div>
+          <div class="flex justify-between items-center bg-white p-2.5 rounded border border-slate-200">
+            <span class="font-extrabold text-sm text-slate-900">${engine.getTeamName(m.teamBId)}</span>
+            <span class="font-black text-base text-[#004587]">${m.scoreB !== null ? m.scoreB : '-'}</span>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = `
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <div class="navy-bg text-white px-4 py-2.5 rounded font-black text-xs uppercase tracking-wider">1. Semifinals</div>
+          ${semis.length ? semis.map(renderCard).join('') : '<p class="text-xs text-slate-400 italic">Generate schedule first.</p>'}
+        </div>
+
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <div class="bg-emerald-700 text-white px-4 py-2.5 rounded font-black text-xs uppercase tracking-wider">2. Championship & Bronze Finals</div>
+          ${champName ? `
+            <div class="gold-bg p-4 rounded-xl text-center shadow-inner">
+              <div class="text-3xl mb-1">🏆</div>
+              <div class="text-[11px] font-black uppercase tracking-widest text-slate-800">Tournament Champion</div>
+              <div class="text-2xl font-black text-[#004587] mt-1">${champName}</div>
+            </div>
+          ` : ''}
+          ${finals.length ? finals.map(renderCard).join('') : '<p class="text-xs text-slate-400 italic">Generate schedule first.</p>'}
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // BACKUP & RESTORE
+    // ==========================================
+    function exportJson() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(engine.state, null, 2));
+      const dlAnchor = document.createElement('a');
+      dlAnchor.setAttribute("href", dataStr);
+      dlAnchor.setAttribute("download", `tournament_backup_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(dlAnchor);
+      dlAnchor.click();
+      dlAnchor.remove();
+    }
+
+    function importJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          engine.state = JSON.parse(e.target.result);
+          engine.saveState();
+          syncSetupInputsFromState();
+          renderAll();
+          alert('Tournament backup restored!');
+        } catch (err) {
+          alert('Invalid JSON file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function confirmReset() {
+      if (confirm('Reset tournament setup, schedule, and all scores?')) {
+        engine.resetAll();
+        syncSetupInputsFromState();
+        switchTab('SETUP');
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
