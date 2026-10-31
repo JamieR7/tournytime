@@ -1,6 +1,6 @@
 const state = {
   title: "PE TOURNAMENT",
-  numTeams: 8,
+  numTeams: 8, // Supports 4 to 12 teams
   format: "groups", // 'groups' | 'roundrobin'
   timingMode: "finish", // 'finish' | 'manual'
   startTimeMode: "now", // 'now' | 'custom'
@@ -9,10 +9,11 @@ const state = {
   manualMinutes: 4,
   manualSeconds: 0,
   intermissionSeconds: 10,
-  numCourts: 2,
+  numCourts: 2, // Supports 1 to 4 courts
   teamNames: [
     "Team 1", "Team 2", "Team 3", "Team 4",
-    "Team 5", "Team 6", "Team 7", "Team 8"
+    "Team 5", "Team 6", "Team 7", "Team 8",
+    "Team 9", "Team 10", "Team 11", "Team 12"
   ],
   courtNames: ["Court 1", "Court 2", "Court 3", "Court 4"],
 
@@ -31,7 +32,8 @@ const state = {
 
 const FUN_PE_NAMES = [
   "Versoix Vipers", "Léman Panthers", "Geneva Giants", "Alpine Eagles",
-  "Divonne Dynamos", "Jura Jaguars", "Mont Blanc Bears", "Rhône Raiders"
+  "Divonne Dynamos", "Jura Jaguars", "Mont Blanc Bears", "Rhône Raiders",
+  "Lausanne Lions", "Nyon Ninjas", "Valais Vikings", "Bern Broncos"
 ];
 
 let audioCtx = null;
@@ -107,7 +109,7 @@ function playStartWhistle() {
 
 function generateRoundRobinPairings(teams) {
   const list = [...teams];
-  if (list.length % 2 !== 0) list.push(null);
+  if (list.length % 2 !== 0) list.push(null); // Bye for odd team counts
   const n = list.length;
   const numRounds = n - 1;
   const half = n / 2;
@@ -153,7 +155,9 @@ function packMatchesIntoRounds(matchPool, numCourts) {
 }
 
 function buildTournamentSchedule() {
-  const activeTeams = state.teamNames.slice(0, state.numTeams).map((t, idx) => t.trim() || `Team ${idx + 1}`);
+  const activeTeams = state.teamNames
+    .slice(0, state.numTeams)
+    .map((t, idx) => t.trim() || `Team ${idx + 1}`);
   const numCourts = state.numCourts;
   let allRounds = [];
   let matchIdCounter = 1;
@@ -171,6 +175,7 @@ function buildTournamentSchedule() {
     }));
     allRounds = packMatchesIntoRounds(rawPairings, numCourts);
   } else {
+    // 2 Groups split (supports 4 to 12 teams, including odd numbers like 5, 7, 9, 11)
     const half = Math.ceil(activeTeams.length / 2);
     const groupA = activeTeams.slice(0, half);
     const groupB = activeTeams.slice(half);
@@ -205,64 +210,35 @@ function buildTournamentSchedule() {
     }
 
     const groupRounds = packMatchesIntoRounds(interleaved, numCourts);
-    const finalsMatches = [];
 
-    if (activeTeams.length >= 8) {
+    // Build Placement Finals based on how many pairs exist across Group A & Group B
+    const maxCommonRank = Math.min(groupA.length, groupB.length);
+    const placementLabels = {
+      6: "11th Place Playoff",
+      5: "9th Place Playoff",
+      4: "7th Place Playoff",
+      3: "5th Place Playoff",
+      2: "Bronze Final (3rd/4th)",
+      1: "🏆 GRAND FINAL (1st/2nd)"
+    };
+    const ordinal = (n) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
+
+    const finalsMatches = [];
+    for (let r = maxCommonRank; r >= 1; r--) {
       finalsMatches.push({
         id: matchIdCounter++,
         stage: "FINALS",
-        groupLabel: "7th Place Playoff",
-        placeholderA: { group: "A", rank: 4 },
-        placeholderB: { group: "B", rank: 4 },
-        teamA: "4th Group A",
-        teamB: "4th Group B",
+        groupLabel: placementLabels[r] || `Rank ${r} Playoff`,
+        placeholderA: { group: "A", rank: r },
+        placeholderB: { group: "B", rank: r },
+        teamA: `${ordinal(r)} Group A`,
+        teamB: `${ordinal(r)} Group B`,
         scoreA: 0,
         scoreB: 0,
         completed: false,
         isFinal: true
       });
     }
-    if (activeTeams.length >= 6) {
-      finalsMatches.push({
-        id: matchIdCounter++,
-        stage: "FINALS",
-        groupLabel: "5th Place Playoff",
-        placeholderA: { group: "A", rank: 3 },
-        placeholderB: { group: "B", rank: 3 },
-        teamA: "3rd Group A",
-        teamB: "3rd Group B",
-        scoreA: 0,
-        scoreB: 0,
-        completed: false,
-        isFinal: true
-      });
-    }
-    finalsMatches.push({
-      id: matchIdCounter++,
-      stage: "FINALS",
-      groupLabel: "Bronze Final (3rd/4th)",
-      placeholderA: { group: "A", rank: 2 },
-      placeholderB: { group: "B", rank: 2 },
-      teamA: "2nd Group A",
-      teamB: "2nd Group B",
-      scoreA: 0,
-      scoreB: 0,
-      completed: false,
-      isFinal: true
-    });
-    finalsMatches.push({
-      id: matchIdCounter++,
-      stage: "FINALS",
-      groupLabel: "🏆 GRAND FINAL (1st/2nd)",
-      placeholderA: { group: "A", rank: 1 },
-      placeholderB: { group: "B", rank: 1 },
-      teamA: "1st Group A",
-      teamB: "1st Group B",
-      scoreA: 0,
-      scoreB: 0,
-      completed: false,
-      isFinal: true
-    });
 
     const finalsRounds = [];
     for (let i = 0; i < finalsMatches.length; i += numCourts) {
@@ -291,7 +267,10 @@ function computeGroupStandings(teamList, groupFilterLabel = null) {
     rnd.forEach((m) => {
       if (m.isFinal) return;
       if (groupFilterLabel && m.groupLabel !== groupFilterLabel) return;
-      const isPlayed = m.completed || rIdx < state.currentRoundIndex || (rIdx === state.currentRoundIndex && (m.scoreA > 0 || m.scoreB > 0));
+      const isPlayed =
+        m.completed ||
+        rIdx < state.currentRoundIndex ||
+        (rIdx === state.currentRoundIndex && (m.scoreA > 0 || m.scoreB > 0));
       if (!isPlayed) return;
 
       const stA = stats[m.teamA];
@@ -334,7 +313,9 @@ function computeGroupStandings(teamList, groupFilterLabel = null) {
 
 function updateFinalsSeedingIfReady() {
   if (state.format !== "groups") return;
-  const activeTeams = state.teamNames.slice(0, state.numTeams).map((t, i) => t.trim() || `Team ${i + 1}`);
+  const activeTeams = state.teamNames
+    .slice(0, state.numTeams)
+    .map((t, i) => t.trim() || `Team ${i + 1}`);
   const half = Math.ceil(activeTeams.length / 2);
   const groupATeams = activeTeams.slice(0, half);
   const groupBTeams = activeTeams.slice(half);
@@ -384,7 +365,7 @@ function calculateGameDurationSeconds(numRounds) {
   if (diffSeconds <= 0) diffSeconds += 24 * 3600;
 
   const totalIntermission = Math.max(0, numRounds - 1) * state.intermissionSeconds;
-  const availablePlaySeconds = Math.max(numRounds * 30, diffSeconds - totalIntermission);
+  const availablePlaySeconds = Math.max(numRounds * 25, diffSeconds - totalIntermission);
   return Math.floor(availablePlaySeconds / numRounds);
 }
 
@@ -412,16 +393,25 @@ function initSetupDefaults() {
 }
 
 function renderSetupView() {
+  document.getElementById("selectedTeamsBadge").textContent = `${state.numTeams} Teams`;
+
   document.querySelectorAll(".team-count-btn").forEach((btn) => {
     const count = parseInt(btn.getAttribute("data-teams"), 10);
-    btn.className = count === state.numTeams
-      ? "team-count-btn rounded-xl border-2 border-gold-500 bg-gold-500/20 text-white py-3 font-black text-sm uppercase tracking-wider transition shadow-md"
-      : "team-count-btn rounded-xl border-2 border-slate-700 bg-navy-950/60 text-slate-300 hover:border-slate-500 py-3 font-black text-sm uppercase tracking-wider transition";
+    btn.className =
+      count === state.numTeams
+        ? "team-count-btn rounded-xl border-2 border-gold-500 bg-gold-500/20 text-white py-2.5 font-black text-sm transition shadow-md"
+        : "team-count-btn rounded-xl border-2 border-slate-700 bg-navy-950/60 text-slate-300 hover:border-slate-500 py-2.5 font-black text-sm transition";
   });
 
-  const half = state.numTeams / 2;
+  const countA = Math.ceil(state.numTeams / 2);
+  const countB = state.numTeams - countA;
   const groupDesc = document.getElementById("groupFormatDesc");
-  if (groupDesc) groupDesc.textContent = `2 Groups of ${half} + Placement Finals`;
+  if (groupDesc) {
+    groupDesc.textContent =
+      countA === countB
+        ? `2 Groups of ${countA} + Placement Finals`
+        : `Group A (${countA}) & Group B (${countB}) + Finals`;
+  }
 
   document.querySelectorAll(".format-btn").forEach((btn) => {
     const fmt = btn.getAttribute("data-format");
@@ -440,9 +430,10 @@ function renderSetupView() {
 
   document.querySelectorAll(".timing-mode-btn").forEach((btn) => {
     const mode = btn.getAttribute("data-timing");
-    btn.className = mode === state.timingMode
-      ? "timing-mode-btn rounded-xl border-2 border-gold-500 bg-gold-500/20 text-white py-2.5 px-3 text-xs font-black uppercase tracking-wider transition"
-      : "timing-mode-btn rounded-xl border-2 border-slate-700 bg-navy-950/60 text-slate-400 hover:border-slate-500 py-2.5 px-3 text-xs font-black uppercase tracking-wider transition";
+    btn.className =
+      mode === state.timingMode
+        ? "timing-mode-btn rounded-xl border-2 border-gold-500 bg-gold-500/20 text-white py-2.5 px-3 text-xs font-black uppercase tracking-wider transition"
+        : "timing-mode-btn rounded-xl border-2 border-slate-700 bg-navy-950/60 text-slate-400 hover:border-slate-500 py-2.5 px-3 text-xs font-black uppercase tracking-wider transition";
   });
 
   document.getElementById("finishTimePanel").classList.toggle("hidden", state.timingMode !== "finish");
@@ -450,23 +441,30 @@ function renderSetupView() {
 
   document.querySelectorAll(".court-count-btn").forEach((btn) => {
     const c = parseInt(btn.getAttribute("data-courts"), 10);
-    btn.className = c === state.numCourts
-      ? "court-count-btn rounded-xl border-2 border-gold-500 bg-gold-500/20 text-white py-3 font-black text-sm transition shadow-md"
-      : "court-count-btn rounded-xl border-2 border-slate-700 bg-navy-950/60 text-slate-300 hover:border-slate-500 py-3 font-black text-sm transition";
+    btn.className =
+      c === state.numCourts
+        ? "court-count-btn rounded-xl border-2 border-gold-500 bg-gold-500/20 text-white py-3 font-black text-sm transition shadow-md"
+        : "court-count-btn rounded-xl border-2 border-slate-700 bg-navy-950/60 text-slate-300 hover:border-slate-500 py-3 font-black text-sm transition";
   });
 
   const teamContainer = document.getElementById("teamNamesContainer");
   teamContainer.innerHTML = "";
   for (let i = 0; i < state.numTeams; i++) {
     const row = document.createElement("div");
-    row.className = "flex items-center gap-3";
-    const groupTag = state.format === "groups"
-      ? `<span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-slate-800 text-gold-400 border border-slate-700">${i < state.numTeams / 2 ? "Grp A" : "Grp B"}</span>`
-      : "";
+    row.className = "flex items-center gap-2";
+    const isGroupA = i < countA;
+    const groupTag =
+      state.format === "groups"
+        ? `<span class="text-[10px] font-black uppercase px-2 py-0.5 rounded shrink-0 ${
+            isGroupA
+              ? "bg-navy-800 text-gold-400 border border-gold-500/30"
+              : "bg-slate-800 text-slate-300 border border-slate-700"
+          }">${isGroupA ? "Grp A" : "Grp B"}</span>`
+        : "";
     row.innerHTML = `
-      <span class="w-6 text-xs font-black text-slate-400">${i + 1}.</span>
+      <span class="w-5 text-xs font-black text-slate-400">${i + 1}.</span>
       <input type="text" data-team-idx="${i}" value="${state.teamNames[i] || `Team ${i + 1}`}"
-        class="team-name-input flex-1 rounded-xl border border-slate-700 bg-navy-950 px-3.5 py-2.5 text-sm font-bold text-white focus:border-gold-500 focus:outline-none transition" />
+        class="team-name-input flex-1 min-w-0 rounded-xl border border-slate-700 bg-navy-950 px-3 py-2 text-sm font-bold text-white focus:border-gold-500 focus:outline-none transition" />
       ${groupTag}
     `;
     teamContainer.appendChild(row);
@@ -539,15 +537,19 @@ function renderArenaView() {
 
   document.getElementById("prevRoundBtn").disabled = state.currentRoundIndex <= 0;
   const nextBtnText = document.getElementById("nextRoundBtnText");
-  nextBtnText.textContent = state.currentRoundIndex >= totalRounds - 1
-    ? "FINISH TOURNAMENT"
-    : (state.inIntermission ? "SKIP WAIT & START NEXT ROUND" : "NEXT ROUND");
+  nextBtnText.textContent =
+    state.currentRoundIndex >= totalRounds - 1
+      ? "FINISH TOURNAMENT"
+      : state.inIntermission
+      ? "SKIP WAIT & START NEXT ROUND"
+      : "NEXT ROUND";
 
   const courtsGrid = document.getElementById("courtsGrid");
   courtsGrid.innerHTML = "";
-  courtsGrid.className = state.numCourts === 1
-    ? "grid grid-cols-1 max-w-2xl mx-auto gap-6"
-    : "grid grid-cols-1 lg:grid-cols-2 gap-6";
+  courtsGrid.className =
+    state.numCourts === 1
+      ? "grid grid-cols-1 max-w-2xl mx-auto gap-6"
+      : "grid grid-cols-1 lg:grid-cols-2 gap-6";
 
   for (let cIdx = 0; cIdx < state.numCourts; cIdx++) {
     const courtName = state.courtNames[cIdx] || `Court ${cIdx + 1}`;
@@ -555,16 +557,18 @@ function renderArenaView() {
     const upNextMatch = nextRound[cIdx];
 
     const card = document.createElement("div");
-    card.className = `rounded-3xl border-2 ${state.inIntermission ? "border-gold-500 bg-navy-900" : "border-slate-700/90 bg-navy-900/90"} p-6 shadow-2xl flex flex-col justify-between transition-all`;
+    card.className = `rounded-3xl border-2 ${
+      state.inIntermission ? "border-gold-500 bg-navy-900" : "border-slate-700/90 bg-navy-900/90"
+    } p-6 shadow-2xl flex flex-col justify-between transition-all`;
 
     if (!match) {
       card.innerHTML = `
         <div>
           <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-6">
             <h3 class="text-xl font-black uppercase tracking-wider text-slate-400">${courtName}</h3>
-            <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-slate-800 text-slate-400">No Match Scheduled</span>
+            <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-slate-800 text-slate-400">Idle</span>
           </div>
-          <p class="text-center text-slate-500 font-bold py-8">Court Idle This Round</p>
+          <p class="text-center text-slate-500 font-bold py-8">No Match Needed on ${courtName} This Round</p>
         </div>
       `;
     } else {
@@ -576,7 +580,7 @@ function renderArenaView() {
              </div>
              <span class="text-[11px] font-bold text-slate-400">${upNextMatch.groupLabel}</span>
            </div>`
-        : `<div class="mt-6 pt-4 border-t border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">Final Round on ${courtName}</div>`;
+        : `<div class="mt-6 pt-4 border-t border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">Final Scheduled Match on ${courtName}</div>`;
 
       card.innerHTML = `
         <div>
@@ -659,11 +663,13 @@ function renderFixturesList() {
 
       const row = document.createElement("div");
       row.className = `flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-xs transition ${
-        isCurrentRound ? "bg-navy-800/40 border-gold-500/60 text-white font-bold" : "bg-navy-950/40 border-slate-800/80 text-slate-300"
+        isCurrentRound
+          ? "bg-navy-800/40 border-gold-500/60 text-white font-bold"
+          : "bg-navy-950/40 border-slate-800/80 text-slate-300"
       }`;
 
       row.innerHTML = `
-        <div class="flex items-center gap-2 min-w-[78px]">
+        <div class="flex items-center gap-2 min-w-[85px]">
           <span class="font-black text-slate-400">R${m.roundNumber}</span>
           <span class="text-[11px] text-slate-400 truncate">${m.groupLabel}</span>
         </div>
@@ -693,7 +699,9 @@ function renderFixturesList() {
 }
 
 function createStandingsTableHTML(title, rows) {
-  const trs = rows.map((r, idx) => `
+  const trs = rows
+    .map(
+      (r, idx) => `
     <tr class="border-b border-slate-800/80 ${idx === 0 ? "bg-gold-500/10" : ""}">
       <td class="py-2.5 px-2 font-black text-slate-400">${idx + 1}</td>
       <td class="py-2.5 px-2 font-extrabold text-white">${r.team}</td>
@@ -704,7 +712,9 @@ function createStandingsTableHTML(title, rows) {
       <td class="py-2.5 px-2 text-center text-slate-300">${r.GD > 0 ? `+${r.GD}` : r.GD}</td>
       <td class="py-2.5 px-2 text-center font-black text-gold-400 text-sm">${r.Pts}</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 
   return `
     <div class="rounded-3xl border-2 border-slate-800 bg-navy-900/90 p-5 sm:p-6 shadow-xl">
@@ -735,7 +745,9 @@ function createStandingsTableHTML(title, rows) {
 
 function renderStandingsTables() {
   const container = document.getElementById("standingsContainer");
-  const activeTeams = state.teamNames.slice(0, state.numTeams).map((t, i) => t.trim() || `Team ${i + 1}`);
+  const activeTeams = state.teamNames
+    .slice(0, state.numTeams)
+    .map((t, i) => t.trim() || `Team ${i + 1}`);
 
   if (state.format === "roundrobin") {
     const standings = computeGroupStandings(activeTeams, null);
@@ -845,7 +857,9 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('input[name="startTimeMode"]').forEach((radio) => {
     radio.addEventListener("change", (e) => {
       state.startTimeMode = e.target.value;
-      document.getElementById("customStartTimeInput").classList.toggle("hidden", state.startTimeMode !== "custom");
+      document
+        .getElementById("customStartTimeInput")
+        .classList.toggle("hidden", state.startTimeMode !== "custom");
       renderSetupView();
     });
   });
@@ -884,6 +898,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("presetNamesBtn").addEventListener("click", () => {
     state.teamNames = [...FUN_PE_NAMES];
+    renderSetupView();
+  });
+
+  document.getElementById("resetDefaultNamesBtn").addEventListener("click", () => {
+    state.teamNames = Array.from({ length: 12 }, (_, i) => `Team ${i + 1}`);
     renderSetupView();
   });
 
