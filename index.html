@@ -1,270 +1,338 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Live Arena Display — Tournament Scoreboard</title>
+  <title>PE Tournament Manager</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            navy: {
+              950: '#040d1a',
+              900: '#07162c',
+              800: '#004587',
+              700: '#0a58a3',
+            },
+            gold: {
+              400: '#ffca2c',
+              500: '#fbba07',
+              600: '#d99f00',
+            },
+            crimson: {
+              500: '#e73037',
+              600: '#c82329',
+            }
+          },
+          fontFamily: {
+            sans: ['Gotham', 'Montserrat', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@700;800&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Montserrat', sans-serif; background-color: #000; color: #fff; }
-    .neon-border { border: 2px solid #334155; box-shadow: 0 0 20px rgba(0, 69, 135, 0.3); }
-    .live-glow { text-shadow: 0 0 10px rgba(34, 197, 94, 0.6); }
+    body {
+      font-family: 'Montserrat', 'Inter', sans-serif;
+    }
+    .timer-digits {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.03em;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(251, 186, 7, 0.5); }
+      50% { transform: scale(1.015); box-shadow: 0 0 35px 8px rgba(251, 186, 7, 0.28); }
+    }
+    .intermission-glow {
+      animation: pulse-ring 1.5s infinite ease-in-out;
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.4); }
+    ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.5); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(251, 186, 7, 0.8); }
   </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between p-6">
+<body class="bg-navy-950 text-slate-100 min-h-screen transition-colors duration-300 selection:bg-gold-500 selection:text-navy-950">
 
-  <!-- TOP HEADER BAR -->
-  <header class="flex items-center justify-between border-b border-slate-800 pb-4">
-    <div class="flex items-center gap-4">
-      <span class="text-4xl">🏟️</span>
-      <div>
-        <h1 id="screenTitle" class="text-2xl font-black tracking-wider uppercase text-amber-400">TOURNAMENT LIVE ARENA</h1>
-        <p id="screenSubtitle" class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">Real-Time Court Feed & Standings</p>
-      </div>
-    </div>
-
-    <div class="flex items-center gap-4">
-      <div id="liveClockBadge" class="bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl text-center">
-        <div class="text-[10px] font-bold text-slate-400 uppercase">Current Time Slot</div>
-        <div id="slotTimeDisplay" class="text-sm font-black text-amber-400">-- : --</div>
+  <!-- TOP NAVIGATION / HEADER -->
+  <header class="border-b border-slate-800/80 bg-navy-900/75 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-navy-800 border-2 border-gold-500 flex items-center justify-center shadow-lg shadow-navy-800/40">
+          <span class="text-gold-500 font-black text-lg tracking-tighter">PE</span>
+        </div>
+        <div>
+          <h1 id="headerTitle" class="text-xl sm:text-2xl font-black tracking-wider uppercase text-white">PE TOURNAMENT</h1>
+          <p id="headerSubtitle" class="text-xs font-semibold text-slate-400 tracking-wide uppercase">Push & Play Arena</p>
+        </div>
       </div>
 
-      <!-- Quick Action Buttons for Scorekeeper -->
-      <button onclick="openStandingsModal()" class="bg-blue-900 hover:bg-blue-800 text-blue-100 font-extrabold text-xs px-4 py-3 rounded-xl border border-blue-700 uppercase tracking-wider">
-        📊 Standings Board
-      </button>
-      <button onclick="openHistoryModal()" class="bg-slate-900 hover:bg-slate-800 text-slate-200 font-extrabold text-xs px-4 py-3 rounded-xl border border-slate-700 uppercase tracking-wider">
-        ✏️ Fix Previous Scores
-      </button>
+      <div class="flex items-center gap-2.5">
+        <button id="testSoundBtn" type="button" title="Test Arena Buzzer" class="px-3 py-2 rounded-xl border border-slate-700/80 bg-slate-800/60 hover:bg-slate-700/70 text-xs font-bold uppercase tracking-wider text-gold-400 flex items-center gap-1.5 transition">
+          <span>🔊</span> <span class="hidden sm:inline">Test Horn</span>
+        </button>
+        <button id="setupToggleBtn" type="button" class="hidden px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-800/80 hover:border-gold-500/60 text-xs font-bold uppercase tracking-wider text-slate-200 transition flex items-center gap-1.5">
+          <span>⚙️</span> <span>Setup</span>
+        </button>
+        <button id="themeToggleBtn" type="button" title="Toggle Dark/Light Mode" class="w-10 h-10 rounded-full border border-slate-700 bg-slate-800/70 hover:border-gold-500 flex items-center justify-center text-lg transition">
+          ☀️
+        </button>
+      </div>
     </div>
   </header>
 
-  <!-- MAIN BLACK DISPLAY (NOW PLAYING & UP NEXT) -->
-  <main class="my-6 grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
-    
-    <!-- LEFT 2 COLS: NOW PLAYING ON COURTS -->
-    <div class="lg:col-span-2 flex flex-col space-y-4">
-      <div class="flex items-center justify-between px-2">
-        <div class="flex items-center gap-2">
-          <span class="w-3 h-3 rounded-full bg-green-500 animate-ping"></span>
-          <h2 class="text-lg font-black tracking-widest uppercase text-green-400 live-glow">NOW PLAYING — ACTIVE COURTS</h2>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+    <!-- VIEW 1: TOURNAMENT SETUP -->
+    <section id="setupView" class="max-w-4xl mx-auto">
+      <div class="rounded-3xl border-2 border-slate-800 bg-navy-900/90 shadow-2xl p-6 sm:p-8 space-y-8">
+        
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">⚙️</span>
+            <h2 class="text-2xl font-black uppercase tracking-wider text-white">Tournament Setup</h2>
+          </div>
+          <span class="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-gold-500/15 text-gold-400 border border-gold-500/30">2-File Standalone</span>
         </div>
-        <span id="activeSlotNumBadge" class="text-xs font-bold bg-slate-900 px-3 py-1 rounded-lg border border-slate-800 text-slate-300">Slot #1</span>
+
+        <!-- Tournament Title -->
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Tournament Title</label>
+          <input id="tournamentTitleInput" type="text" value="PE TOURNAMENT" placeholder="Enter Tournament Title..." 
+            class="w-full rounded-2xl border-2 border-slate-700/80 bg-navy-950/90 px-4 py-3.5 text-center text-lg font-black uppercase tracking-wider text-white focus:border-gold-500 focus:outline-none transition" />
+        </div>
+
+        <!-- Teams & Format Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+          
+          <!-- Left Column: Number of Teams & Format -->
+          <div class="md:col-span-6 space-y-6">
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5">👥 Number of Teams</label>
+              <div class="grid grid-cols-3 gap-3" id="teamCountGroup">
+                <button type="button" data-teams="4" class="team-count-btn rounded-xl border-2 py-3 font-black text-sm uppercase tracking-wider transition">4 Teams</button>
+                <button type="button" data-teams="6" class="team-count-btn rounded-xl border-2 py-3 font-black text-sm uppercase tracking-wider transition">6 Teams</button>
+                <button type="button" data-teams="8" class="team-count-btn rounded-xl border-2 py-3 font-black text-sm uppercase tracking-wider transition">8 Teams</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5">🏆 Select Format</label>
+              <div class="space-y-3" id="formatGroup">
+                <button type="button" data-format="groups" class="format-btn w-full text-left rounded-2xl border-2 p-4 transition flex items-start gap-3.5">
+                  <div class="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 format-radio">
+                    <div class="w-2.5 h-2.5 rounded-full bg-gold-500 hidden format-dot"></div>
+                  </div>
+                  <div>
+                    <div class="font-black text-base text-white">Group Stage + Finals</div>
+                    <div id="groupFormatDesc" class="text-xs font-semibold text-slate-400 mt-0.5">2 Groups of 4 + Placement Finals</div>
+                  </div>
+                </button>
+
+                <button type="button" data-format="roundrobin" class="format-btn w-full text-left rounded-2xl border-2 p-4 transition flex items-start gap-3.5">
+                  <div class="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 format-radio">
+                    <div class="w-2.5 h-2.5 rounded-full bg-gold-500 hidden format-dot"></div>
+                  </div>
+                  <div>
+                    <div class="font-black text-base text-white">Full Round Robin</div>
+                    <div class="text-xs font-semibold text-slate-400 mt-0.5">All teams play each other in one league</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Timing Section -->
+            <div class="pt-4 border-t border-slate-800 space-y-4">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-bold uppercase tracking-widest text-slate-400">⏱️ Timing & Auto-Advance</label>
+                <span id="calcRoundsBadge" class="text-xs font-bold text-gold-400">9 Rounds Total</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3" id="timingModeGroup">
+                <button type="button" data-timing="finish" class="timing-mode-btn rounded-xl border-2 py-2.5 px-3 text-xs font-black uppercase tracking-wider transition">🎯 By Finish Time</button>
+                <button type="button" data-timing="manual" class="timing-mode-btn rounded-xl border-2 py-2.5 px-3 text-xs font-black uppercase tracking-wider transition">⏳ Fixed Game Duration</button>
+              </div>
+
+              <!-- Finish Time Sub-panel -->
+              <div id="finishTimePanel" class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-navy-950/70 p-4 rounded-2xl border border-slate-800">
+                <div>
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Start Time</label>
+                  <div class="space-y-2">
+                    <label class="flex items-center gap-2 text-sm font-bold text-slate-200 cursor-pointer">
+                      <input type="radio" name="startTimeMode" value="now" checked class="accent-gold-500" />
+                      <span>Start Now</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm font-bold text-slate-200 cursor-pointer">
+                      <input type="radio" name="startTimeMode" value="custom" class="accent-gold-500" />
+                      <span>Custom Start</span>
+                    </label>
+                    <input id="customStartTimeInput" type="time" value="10:00" class="hidden w-full rounded-xl border border-slate-700 bg-navy-900 px-3 py-1.5 text-sm font-bold text-white" />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Desired Finish Time</label>
+                  <input id="desiredFinishTimeInput" type="time" value="11:00" class="w-full rounded-xl border border-slate-700 bg-navy-900 px-3 py-2 text-base font-black text-white focus:border-gold-500 focus:outline-none" />
+                  <p id="autoCalcGameTimeText" class="text-[11px] font-semibold text-gold-400 mt-1.5">Game time will be auto-calculated.</p>
+                </div>
+              </div>
+
+              <!-- Manual Duration Sub-panel -->
+              <div id="manualDurationPanel" class="hidden bg-navy-950/70 p-4 rounded-2xl border border-slate-800">
+                <div class="flex items-center justify-between gap-4">
+                  <div class="flex-1">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Minutes Per Game</label>
+                    <input id="manualMinutesInput" type="number" min="1" max="60" value="4" class="w-full rounded-xl border border-slate-700 bg-navy-900 px-3 py-2 text-base font-black text-white" />
+                  </div>
+                  <div class="flex-1">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Seconds</label>
+                    <input id="manualSecondsInput" type="number" min="0" max="59" step="5" value="0" class="w-full rounded-xl border border-slate-700 bg-navy-900 px-3 py-2 text-base font-black text-white" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Score Display / Intermission Duration -->
+              <div class="flex items-center justify-between bg-navy-950/70 px-4 py-3 rounded-2xl border border-slate-800">
+                <div>
+                  <div class="text-xs font-bold uppercase tracking-wider text-slate-200">🔔 End-of-Game Score Display</div>
+                  <div class="text-[11px] text-slate-400">Buzzer sounds, scores show, then next round starts automatically</div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <input id="intermissionSecInput" type="number" min="3" max="60" value="10" class="w-16 rounded-xl border border-slate-700 bg-navy-900 px-2.5 py-1.5 text-center text-sm font-black text-gold-400" />
+                  <span class="text-xs font-bold text-slate-400">sec</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Team Names -->
+          <div class="md:col-span-6">
+            <div class="flex items-center justify-between mb-2.5">
+              <label class="block text-xs font-bold uppercase tracking-widest text-slate-400">📝 Team Names</label>
+              <button id="presetNamesBtn" type="button" class="text-xs font-bold text-gold-400 hover:underline">🎲 Fill Fun PE Names</button>
+            </div>
+            <div id="teamNamesContainer" class="space-y-2.5"></div>
+          </div>
+        </div>
+
+        <!-- Courts Section -->
+        <div class="pt-6 border-t border-slate-800 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+          <div class="md:col-span-5">
+            <label class="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5">🏟️ Number of Courts / Pitches</label>
+            <div class="grid grid-cols-4 gap-2.5" id="courtCountGroup">
+              <button type="button" data-courts="1" class="court-count-btn rounded-xl border-2 py-3 font-black text-sm transition">1</button>
+              <button type="button" data-courts="2" class="court-count-btn rounded-xl border-2 py-3 font-black text-sm transition">2</button>
+              <button type="button" data-courts="3" class="court-count-btn rounded-xl border-2 py-3 font-black text-sm transition">3</button>
+              <button type="button" data-courts="4" class="court-count-btn rounded-xl border-2 py-3 font-black text-sm transition">4</button>
+            </div>
+          </div>
+
+          <div class="md:col-span-7">
+            <label class="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5">🏷️ Court Names</label>
+            <div id="courtNamesContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
+          </div>
+        </div>
+
+        <!-- Start Tournament CTA -->
+        <div class="pt-4">
+          <button id="startTournamentBtn" type="button" class="w-full rounded-2xl bg-gradient-to-r from-navy-800 via-navy-700 to-navy-800 hover:from-gold-500 hover:to-gold-400 hover:text-navy-950 text-white border-2 border-gold-500 py-4 text-lg font-black uppercase tracking-widest shadow-xl transition duration-200 flex items-center justify-center gap-3">
+            <span>🚀</span> <span>START TOURNAMENT</span>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- VIEW 2: LIVE ARENA DASHBOARD -->
+    <section id="arenaView" class="hidden space-y-8">
+
+      <!-- MASTER TIMER & INTERMISSION BANNER -->
+      <div class="max-w-xl mx-auto">
+        <div id="timerCard" class="rounded-3xl border-2 border-slate-700/90 bg-navy-900/95 p-6 text-center shadow-2xl transition-all duration-300 relative overflow-hidden">
+          
+          <div class="flex items-center justify-center gap-2 mb-1">
+            <span id="livePhaseBadge" class="px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-navy-800 text-gold-400 border border-gold-500/40">
+              ROUND 1 / 9 (GROUPS)
+            </span>
+          </div>
+
+          <div id="mainTimerDisplay" class="timer-digits text-7xl sm:text-8xl font-extrabold text-white my-2 select-none">
+            04:00
+          </div>
+
+          <!-- Intermission Overlay Banner -->
+          <div id="intermissionBanner" class="hidden my-3 p-3.5 rounded-2xl bg-gold-500/20 border-2 border-gold-500 text-gold-400">
+            <div class="text-sm font-black uppercase tracking-widest">🔔 FULL TIME! SCORES LOCKED IN</div>
+            <div class="text-xs font-bold text-white mt-1">
+              Next game starts automatically in <span id="intermissionCountdown" class="text-base font-black text-gold-400 underline">10</span>s...
+            </div>
+          </div>
+
+          <!-- Timer Controls -->
+          <div class="flex items-center justify-center gap-3 mt-3">
+            <button id="playPauseBtn" type="button" class="px-7 py-3 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-sm uppercase tracking-widest shadow-lg transition flex items-center gap-2">
+              <span id="playPauseIcon">▶</span> <span id="playPauseText">START</span>
+            </button>
+            <button id="resetTimerBtn" type="button" class="px-5 py-3 rounded-xl border-2 border-slate-700 hover:border-slate-500 bg-slate-800/80 text-slate-200 font-black text-sm uppercase tracking-wider transition flex items-center gap-1.5">
+              <span>↺</span> <span>RESET</span>
+            </button>
+            <button id="hornManualBtn" type="button" title="Sound Buzzer Now" class="px-3.5 py-3 rounded-xl border-2 border-crimson-500/60 hover:bg-crimson-500/20 text-crimson-500 font-black text-sm transition">
+              📣
+            </button>
+          </div>
+
+          <!-- Auto-Advance Toggle Pill -->
+          <div class="mt-4 flex items-center justify-center">
+            <label class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-slate-700 bg-navy-950/80 cursor-pointer select-none text-xs font-bold uppercase tracking-wider text-slate-300 hover:border-gold-500/50 transition">
+              <input id="autoAdvanceCheckbox" type="checkbox" checked class="accent-gold-500 w-4 h-4 rounded" />
+              <span>Auto-Advance on Timer End (10s Score View)</span>
+            </label>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-800/90 flex items-center justify-between text-xs font-bold text-slate-400">
+            <span id="roundBottomLabel">ROUND 1 / 9</span>
+            <span id="expectedFinishLabel">Expected Finish: 11:00</span>
+          </div>
+        </div>
       </div>
 
-      <div id="liveCourtsDisplayGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1"></div>
-    </div>
+      <!-- ACTIVE COURTS SCOREBOARD GRID -->
+      <div id="courtsGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>
 
-    <!-- RIGHT COL: UP NEXT (ON DECK) -->
-    <div class="bg-slate-950 border border-slate-900 rounded-2xl p-5 flex flex-col space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="font-black text-sm uppercase tracking-wider text-amber-400">⏳ UP NEXT (ON DECK)</h3>
-        <span id="nextSlotTimeLabel" class="text-xs font-bold text-slate-400">-- : --</span>
+      <!-- ROUND NAVIGATION BAR -->
+      <div class="flex flex-wrap items-center justify-center gap-4 py-2">
+        <button id="prevRoundBtn" type="button" class="px-5 py-3.5 rounded-2xl border-2 border-slate-700 hover:border-slate-500 bg-navy-900 text-slate-300 font-black text-xs uppercase tracking-widest transition disabled:opacity-40">
+          ‹ PREV ROUND
+        </button>
+        <button id="nextRoundBtn" type="button" class="px-10 py-4 rounded-2xl border-2 border-gold-500 bg-navy-800 hover:bg-gold-500 hover:text-navy-950 text-white font-black text-sm uppercase tracking-widest shadow-xl transition flex items-center gap-2">
+          <span id="nextRoundBtnText">NEXT ROUND</span> <span>›</span>
+        </button>
       </div>
-      <div id="liveUpNextList" class="space-y-3 overflow-y-auto flex-1"></div>
-    </div>
+
+      <!-- FIXTURES & LIVE STANDINGS GRID -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pt-2">
+        <div class="lg:col-span-6 rounded-3xl border-2 border-slate-800 bg-navy-900/90 p-5 sm:p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+            <h3 class="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
+              <span>📋</span> <span>All Fixtures</span>
+            </h3>
+            <span class="text-[11px] font-bold text-slate-400">Click + / − to edit any match</span>
+          </div>
+          <div id="fixturesListContainer" class="space-y-1.5 max-h-[540px] overflow-y-auto pr-1"></div>
+        </div>
+
+        <div id="standingsContainer" class="lg:col-span-6 space-y-6"></div>
+      </div>
+
+    </section>
 
   </main>
 
-  <!-- FOOTER TICKER -->
-  <footer class="border-t border-slate-800 pt-3 flex justify-between items-center text-xs text-slate-500 font-bold uppercase">
-    <div>Multi-Sport Tournament Live Feed • Pack 130 Engine</div>
-    <div id="footerStatus">Auto-Syncing with Main Scoreboard Controller...</div>
-  </footer>
-
-  <!-- MODAL: FULL STANDINGS BOARD -->
-  <div id="standingsModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
-    <div class="bg-slate-950 border border-slate-800 w-full max-w-4xl rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-lg font-black uppercase text-amber-400">📊 Live Standings Board</h3>
-        <button onclick="closeStandingsModal()" class="text-slate-400 hover:text-white font-black text-lg px-2">✕</button>
-      </div>
-      <div id="modalStandingsContainer" class="space-y-6"></div>
-    </div>
-  </div>
-
-  <!-- MODAL: FIX PREVIOUS SCORES -->
-  <div id="historyModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
-    <div class="bg-slate-950 border border-slate-800 w-full max-w-3xl rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-lg font-black uppercase text-amber-400">✏️ Fix Previous Match Scores</h3>
-        <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-white font-black text-lg px-2">✕</button>
-      </div>
-      <p class="text-xs text-slate-400">Select any completed match below to correct scores. Standings and brackets will update instantly.</p>
-      <div id="modalHistoryList" class="space-y-2"></div>
-    </div>
-  </div>
-
-  <script src="tournament-engine.js"></script>
-  <script>
-    const engine = new TournamentEngine();
-
-    function initLiveScreen() {
-      renderLiveScreen();
-      // Auto-poll localStorage every second so main controller changes appear instantly without refreshing
-      setInterval(() => {
-        engine.state = engine.loadState() || engine.state;
-        renderLiveScreen();
-      }, 1000);
-    }
-
-    function renderLiveScreen() {
-      const c = engine.state.config;
-      document.getElementById('screenTitle').textContent = c.title || 'TOURNAMENT LIVE ARENA';
-      document.getElementById('screenSubtitle').textContent = `${c.sport} • ${c.numCourts} Courts Active`;
-
-      const activeSlot = engine.state.slots.find(s => s.slotNumber === engine.state.activeSlotNumber) || engine.state.slots[0];
-      if (!activeSlot) return;
-
-      document.getElementById('activeSlotNumBadge').textContent = `Slot #${activeSlot.slotNumber} (${activeSlot.stage})`;
-      document.getElementById('slotTimeDisplay').textContent = `${activeSlot.startTime} – ${activeSlot.endTime}`;
-
-      // Render Active Courts
-      const courtsGrid = document.getElementById('liveCourtsDisplayGrid');
-      courtsGrid.innerHTML = activeSlot.matches.map(m => {
-        const teamA = engine.getTeamName(m.teamAId);
-        const teamB = engine.getTeamName(m.teamBId);
-        const isDone = m.status === 'COMPLETED';
-
-        return `
-          <div class="bg-slate-950 border ${isDone ? 'border-emerald-600/50' : 'border-slate-800'} rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
-            <div class="flex items-center justify-between">
-              <span class="bg-blue-900 text-blue-100 font-black text-xs px-3 py-1 rounded-lg uppercase tracking-wider">COURT ${m.court}</span>
-              <span class="text-xs font-bold text-slate-400 uppercase">${m.group}</span>
-            </div>
-
-            <div class="grid grid-cols-7 items-center gap-2 my-2">
-              <div class="col-span-3 text-right">
-                <div class="font-black text-base text-white leading-tight truncate">${teamA}</div>
-                <div class="text-[11px] font-bold text-slate-500">${m.teamAId}</div>
-              </div>
-              <div class="col-span-1 text-center font-black text-sm text-slate-600">VS</div>
-              <div class="col-span-3 text-left">
-                <div class="font-black text-base text-white leading-tight truncate">${teamB}</div>
-                <div class="text-[11px] font-bold text-slate-500">${m.teamBId}</div>
-              </div>
-            </div>
-
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-around">
-              <span class="text-3xl font-black text-amber-400">${m.scoreA !== null ? m.scoreA : '-'}</span>
-              <span class="text-xs font-bold text-slate-600 uppercase">Score</span>
-              <span class="text-3xl font-black text-amber-400">${m.scoreB !== null ? m.scoreB : '-'}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      // Render Up Next
-      const nextSlot = engine.state.slots.find(s => s.slotNumber === activeSlot.slotNumber + 1);
-      const upNextList = document.getElementById('liveUpNextList');
-      if (!nextSlot) {
-        document.getElementById('nextSlotTimeLabel').textContent = 'Final Slot';
-        upNextList.innerHTML = `<p class="text-slate-500 text-xs italic">No subsequent time slots.</p>`;
-      } else {
-        document.getElementById('nextSlotTimeLabel').textContent = `${nextSlot.startTime} – ${nextSlot.endTime}`;
-        upNextList.innerHTML = nextSlot.matches.map(m => `
-          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs space-y-1">
-            <div class="flex justify-between font-bold text-amber-400 uppercase">
-              <span>Court ${m.court}</span>
-              <span>${m.group}</span>
-            </div>
-            <div class="font-extrabold text-white text-sm truncate">${engine.getTeamName(m.teamAId)} vs ${engine.getTeamName(m.teamBId)}</div>
-          </div>
-        `).join('');
-      }
-    }
-
-    // Modal Controls
-    function openStandingsModal() {
-      const container = document.getElementById('modalStandingsContainer');
-      const groups = (engine.state.config.format === 'TWO_POOLS_FINALS' && engine.state.teams.length >= 6)
-        ? ['Pool A', 'Pool B']
-        : ['League'];
-
-      container.innerHTML = groups.map(gName => {
-        const rows = engine.getGroupStandings(gName);
-        return `
-          <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-            <div class="bg-blue-950 text-blue-200 px-4 py-3 font-black text-xs uppercase tracking-wider">${gName} Standings</div>
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-900 text-slate-400 uppercase border-b border-slate-800">
-                <tr>
-                  <th class="py-2.5 px-4">Pos</th>
-                  <th class="py-2.5 px-4">Team</th>
-                  <th class="py-2.5 px-3 text-center">P</th>
-                  <th class="py-2.5 px-3 text-center">GD</th>
-                  <th class="py-2.5 px-4 text-center">PTS</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800">
-                ${rows.map((r, idx) => `
-                  <tr>
-                    <td class="py-2.5 px-4">${idx + 1}</td>
-                    <td class="py-2.5 px-4 font-extrabold text-white">${r.teamName}</td>
-                    <td class="py-2.5 px-3 text-center">${r.played}</td>
-                    <td class="py-2.5 px-3 text-center font-bold">${r.gd > 0 ? `+${r.gd}` : r.gd}</td>
-                    <td class="py-2.5 px-4 text-center font-black text-amber-400">${r.pts}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        `;
-      }).join('');
-
-      document.getElementById('standingsModal').classList.remove('hidden');
-    }
-
-    function closeStandingsModal() {
-      document.getElementById('standingsModal').classList.add('hidden');
-    }
-
-    function openHistoryModal() {
-      const list = document.getElementById('modalHistoryList');
-      const completedMatches = [];
-      engine.state.slots.forEach(s => {
-        s.matches.forEach(m => {
-          if (m.status === 'COMPLETED') completedMatches.push({ ...m, slotNum: s.slotNumber });
-        });
-      });
-
-      if (completedMatches.length === 0) {
-        list.innerHTML = `<p class="text-slate-500 text-xs italic py-4 text-center">No completed matches recorded yet.</p>`;
-      } else {
-        list.innerHTML = completedMatches.map(m => `
-          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs gap-3">
-            <div>
-              <span class="text-amber-400 font-bold uppercase">Slot #${m.slotNum} (Court ${m.court})</span>
-              <div class="font-extrabold text-white text-sm">${engine.getTeamName(m.teamAId)} vs ${engine.getTeamName(m.teamBId)}</div>
-            </div>
-            <div class="flex items-center gap-2">
-              <input id="fixA_${m.id}" type="number" value="${m.scoreA}" class="w-12 bg-black border border-slate-700 rounded p-1 text-center font-black text-white" />
-              <span class="text-slate-500">-</span>
-              <input id="fixB_${m.id}" type="number" value="${m.scoreB}" class="w-12 bg-black border border-slate-700 rounded p-1 text-center font-black text-white" />
-              <button onclick="updateHistoryScore('${m.id}')" class="bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-3 py-1 rounded">Update</button>
-            </div>
-          </div>
-        `).join('');
-      }
-
-      document.getElementById('historyModal').classList.remove('hidden');
-    }
-
-    function closeHistoryModal() {
-      document.getElementById('historyModal').classList.add('hidden');
-    }
-
-    function updateHistoryScore(matchId) {
-      const sA = document.getElementById(`fixA_${matchId}`).value;
-      const sB = document.getElementById(`fixB_${matchId}`).value;
-      if (sA === '' || sB === '') return;
-      engine.recordMatchScore(matchId, Number(sA), Number(sB));
-      openHistoryModal(); // Refresh modal list
-      renderLiveScreen();
-    }
-
-    window.addEventListener('DOMContentLoaded', initLiveScreen);
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
