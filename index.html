@@ -90,7 +90,7 @@
   <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
     <!-- VIEW 1: TOURNAMENT SETUP -->
-    <section id="setupView" class="max-w-4xl mx-auto">
+    <section id="setupView" class="max-w-5xl mx-auto">
       <div class="rounded-3xl border-2 border-slate-800 bg-navy-900/90 shadow-2xl p-6 sm:p-8 space-y-8">
         
         <div class="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -98,7 +98,7 @@
             <span class="text-2xl">⚙️</span>
             <h2 class="text-2xl font-black uppercase tracking-wider text-white">Tournament Setup</h2>
           </div>
-          <span class="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-gold-500/15 text-gold-400 border border-gold-500/30">2-File Standalone</span>
+          <span class="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-gold-500/15 text-gold-400 border border-gold-500/30">4–12 Teams • 1–4 Courts</span>
         </div>
 
         <!-- Tournament Title -->
@@ -109,16 +109,25 @@
         </div>
 
         <!-- Teams & Format Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          <!-- Left Column: Number of Teams & Format -->
-          <div class="md:col-span-6 space-y-6">
+          <!-- Left Column: Number of Teams (4-12), Format & Timing -->
+          <div class="lg:col-span-5 space-y-6">
             <div>
-              <label class="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5">👥 Number of Teams</label>
-              <div class="grid grid-cols-3 gap-3" id="teamCountGroup">
-                <button type="button" data-teams="4" class="team-count-btn rounded-xl border-2 py-3 font-black text-sm uppercase tracking-wider transition">4 Teams</button>
-                <button type="button" data-teams="6" class="team-count-btn rounded-xl border-2 py-3 font-black text-sm uppercase tracking-wider transition">6 Teams</button>
-                <button type="button" data-teams="8" class="team-count-btn rounded-xl border-2 py-3 font-black text-sm uppercase tracking-wider transition">8 Teams</button>
+              <div class="flex items-center justify-between mb-2.5">
+                <label class="block text-xs font-bold uppercase tracking-widest text-slate-400">👥 Number of Teams (4–12)</label>
+                <span id="selectedTeamsBadge" class="text-xs font-black text-gold-400">8 Teams</span>
+              </div>
+              <div class="grid grid-cols-3 sm:grid-cols-5 gap-2" id="teamCountGroup">
+                <button type="button" data-teams="4" class="team-count-btn rounded-xl border-2 py-2.5 font-black text-sm transition">4</button>
+                <button type="button" data-teams="5" class="team-count-btn rounded-xl border-2 py-2.5 font-black text-sm transition">5</button>
+                <button type="button" data-teams="6" class="team-count-btn rounded-xl border-2 py-2.5 font-black text-sm transition">6</button>
+                <button type="button" data-teams="7" class="team-count-btn rounded-xl border-2 py-2.5 font-black text-sm transition">7</button>
+                <button type="button" data-teams="8" class="team-count-btn rounded-xl border-2 py-2.5 font-black text-sm transition">8</button>
+                <button type="button" data-teams="9" class="team-count-btn rounded-xl border-2 py-2.5 font-black text-sm transition">9</button>
+                <button type="button" data-teams="10" class="team-count-btn rounded-xl border-2 py-2.5 font-black text-sm transition">10</button>
+                <button type="button" data-teams="11" class="team-count-btn rounded-xl border-2 py-2.5 font-black text-sm transition">11</button>
+                <button type="button" data-teams="12" class="team-count-btn rounded-xl border-2 py-2.5 font-black text-sm transition">12</button>
               </div>
             </div>
 
@@ -151,7 +160,7 @@
             <div class="pt-4 border-t border-slate-800 space-y-4">
               <div class="flex items-center justify-between">
                 <label class="text-xs font-bold uppercase tracking-widest text-slate-400">⏱️ Timing & Auto-Advance</label>
-                <span id="calcRoundsBadge" class="text-xs font-bold text-gold-400">9 Rounds Total</span>
+                <span id="calcRoundsBadge" class="text-xs font-bold text-gold-400">8 Rounds Total</span>
               </div>
 
               <div class="grid grid-cols-2 gap-3" id="timingModeGroup">
@@ -200,7 +209,7 @@
               <div class="flex items-center justify-between bg-navy-950/70 px-4 py-3 rounded-2xl border border-slate-800">
                 <div>
                   <div class="text-xs font-bold uppercase tracking-wider text-slate-200">🔔 End-of-Game Score Display</div>
-                  <div class="text-[11px] text-slate-400">Buzzer sounds, scores show, then next round starts automatically</div>
+                  <div class="text-[11px] text-slate-400">Buzzer sounds, scores show, then next round starts</div>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <input id="intermissionSecInput" type="number" min="3" max="60" value="10" class="w-16 rounded-xl border border-slate-700 bg-navy-900 px-2.5 py-1.5 text-center text-sm font-black text-gold-400" />
@@ -210,20 +219,23 @@
             </div>
           </div>
 
-          <!-- Right Column: Team Names -->
-          <div class="md:col-span-6">
+          <!-- Right Column: Team Names (Up to 12) -->
+          <div class="lg:col-span-7">
             <div class="flex items-center justify-between mb-2.5">
               <label class="block text-xs font-bold uppercase tracking-widest text-slate-400">📝 Team Names</label>
-              <button id="presetNamesBtn" type="button" class="text-xs font-bold text-gold-400 hover:underline">🎲 Fill Fun PE Names</button>
+              <div class="flex items-center gap-3">
+                <button id="resetDefaultNamesBtn" type="button" class="text-xs font-bold text-slate-400 hover:text-white">Reset 1–12</button>
+                <button id="presetNamesBtn" type="button" class="text-xs font-bold text-gold-400 hover:underline">🎲 Fill Fun PE Names</button>
+              </div>
             </div>
-            <div id="teamNamesContainer" class="space-y-2.5"></div>
+            <div id="teamNamesContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
           </div>
         </div>
 
-        <!-- Courts Section -->
+        <!-- Courts Section (1-4 Courts) -->
         <div class="pt-6 border-t border-slate-800 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           <div class="md:col-span-5">
-            <label class="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5">🏟️ Number of Courts / Pitches</label>
+            <label class="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5">🏟️ Number of Courts / Pitches (1–4)</label>
             <div class="grid grid-cols-4 gap-2.5" id="courtCountGroup">
               <button type="button" data-courts="1" class="court-count-btn rounded-xl border-2 py-3 font-black text-sm transition">1</button>
               <button type="button" data-courts="2" class="court-count-btn rounded-xl border-2 py-3 font-black text-sm transition">2</button>
@@ -257,7 +269,7 @@
           
           <div class="flex items-center justify-center gap-2 mb-1">
             <span id="livePhaseBadge" class="px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-navy-800 text-gold-400 border border-gold-500/40">
-              ROUND 1 / 9 (GROUPS)
+              ROUND 1 / 8 (GROUPS)
             </span>
           </div>
 
@@ -295,7 +307,7 @@
           </div>
 
           <div class="mt-4 pt-3 border-t border-slate-800/90 flex items-center justify-between text-xs font-bold text-slate-400">
-            <span id="roundBottomLabel">ROUND 1 / 9</span>
+            <span id="roundBottomLabel">ROUND 1 / 8</span>
             <span id="expectedFinishLabel">Expected Finish: 11:00</span>
           </div>
         </div>
@@ -321,9 +333,9 @@
             <h3 class="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
               <span>📋</span> <span>All Fixtures</span>
             </h3>
-            <span class="text-[11px] font-bold text-slate-400">Click + / − to edit any match</span>
+            <span class="text-[11px] font-bold text-slate-400">Click ▲ / ▼ to edit any match</span>
           </div>
-          <div id="fixturesListContainer" class="space-y-1.5 max-h-[540px] overflow-y-auto pr-1"></div>
+          <div id="fixturesListContainer" class="space-y-1.5 max-h-[560px] overflow-y-auto pr-1"></div>
         </div>
 
         <div id="standingsContainer" class="lg:col-span-6 space-y-6"></div>
