@@ -196,7 +196,7 @@
                 <div class="flex items-center justify-between gap-4">
                   <div class="flex-1">
                     <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Minutes Per Game</label>
-                    <input id="manualMinutesInput" type="number" min="1" max="60" value="4" class="w-full rounded-xl border border-slate-700 bg-navy-900 px-3 py-2 text-base font-black text-white" />
+                    <input id="manualMinutesInput" type="number" min="0" max="60" value="4" class="w-full rounded-xl border border-slate-700 bg-navy-900 px-3 py-2 text-base font-black text-white" />
                   </div>
                   <div class="flex-1">
                     <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Seconds</label>
@@ -302,7 +302,7 @@
           <div class="mt-4 flex items-center justify-center">
             <label class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-slate-700 bg-navy-950/80 cursor-pointer select-none text-xs font-bold uppercase tracking-wider text-slate-300 hover:border-gold-500/50 transition">
               <input id="autoAdvanceCheckbox" type="checkbox" checked class="accent-gold-500 w-4 h-4 rounded" />
-              <span>Auto-Advance on Timer End (10s Score View)</span>
+              <span id="autoAdvanceLabelText">Auto-Advance on Timer End (10s Score View)</span>
             </label>
           </div>
 
