@@ -75,7 +75,7 @@
 
       <div class="flex items-center gap-2.5">
         <button id="testSoundBtn" type="button" title="Test Arena Buzzer" class="px-3 py-2 rounded-xl border border-slate-700/80 bg-slate-800/60 hover:bg-slate-700/70 text-xs font-bold uppercase tracking-wider text-gold-400 flex items-center gap-1.5 transition">
-          <span>🔊</span> <span class="hidden sm:inline">Test Horn</span>
+          <span>🔊</span> <span>Test horn and do 10 push ups</span>
         </button>
         <button id="setupToggleBtn" type="button" class="hidden px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-800/80 hover:border-gold-500/60 text-xs font-bold uppercase tracking-wider text-slate-200 transition flex items-center gap-1.5">
           <span>⚙️</span> <span>Setup</span>
@@ -263,54 +263,127 @@
     <!-- VIEW 2: LIVE ARENA DASHBOARD -->
     <section id="arenaView" class="hidden space-y-8">
 
-      <!-- MASTER TIMER & INTERMISSION BANNER -->
-      <div class="max-w-xl mx-auto">
-        <div id="timerCard" class="rounded-3xl border-2 border-slate-700/90 bg-navy-900/95 p-6 text-center shadow-2xl transition-all duration-300 relative overflow-hidden">
-          
-          <div class="flex items-center justify-center gap-2 mb-1">
-            <span id="livePhaseBadge" class="px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-navy-800 text-gold-400 border border-gold-500/40">
-              ROUND 1 / 8 (GROUPS)
-            </span>
-          </div>
+      <!-- MASTER TIMER FLANKED BY HARVARD PROJECT ZERO THINKING ROUTINES -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
 
-          <div id="mainTimerDisplay" class="timer-digits text-7xl sm:text-8xl font-extrabold text-white my-2 select-none">
-            04:00
-          </div>
-
-          <!-- Intermission Overlay Banner -->
-          <div id="intermissionBanner" class="hidden my-3 p-3.5 rounded-2xl bg-gold-500/20 border-2 border-gold-500 text-gold-400">
-            <div class="text-sm font-black uppercase tracking-widest">🔔 FULL TIME! SCORES LOCKED IN</div>
-            <div class="text-xs font-bold text-white mt-1">
-              Next game starts automatically in <span id="intermissionCountdown" class="text-base font-black text-gold-400 underline">10</span>s...
+        <!-- Left Side: I Used to Think... Now I Think... -->
+        <div class="lg:col-span-3 rounded-3xl border-2 border-slate-800 bg-navy-900/90 p-5 shadow-xl flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-gold-500/15 text-gold-400 border border-gold-500/30">
+                Harvard Project Zero
+              </span>
+              <span class="text-base">💡</span>
             </div>
+            <h3 class="text-base sm:text-lg font-black uppercase tracking-wider text-white leading-snug">
+              I Used to Think...<br />
+              <span class="text-gold-400">Now I Think...</span>
+            </h3>
+            <p class="text-xs font-semibold text-slate-300 mt-2 leading-relaxed">
+              Your first idea isn't right or wrong—it's just your starting point! Between games, reflect with your team on how your tactics or skills are evolving:
+            </p>
+            <ul class="mt-3 space-y-2 text-xs text-slate-200">
+              <li class="p-2.5 rounded-xl bg-navy-950/80 border border-slate-800">
+                <span class="font-black text-gold-400">"I used to think..."</span>
+                <span class="block text-[11px] text-slate-400 mt-0.5">What was your original plan or assumption before playing?</span>
+              </li>
+              <li class="p-2.5 rounded-xl bg-navy-950/80 border border-slate-800">
+                <span class="font-black text-gold-400">"Now I think..."</span>
+                <span class="block text-[11px] text-slate-400 mt-0.5">How and why did your thinking shift after testing it on court?</span>
+              </li>
+            </ul>
           </div>
-
-          <!-- Timer Controls -->
-          <div class="flex items-center justify-center gap-3 mt-3">
-            <button id="playPauseBtn" type="button" class="px-7 py-3 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-sm uppercase tracking-widest shadow-lg transition flex items-center gap-2">
-              <span id="playPauseIcon">▶</span> <span id="playPauseText">START</span>
-            </button>
-            <button id="resetTimerBtn" type="button" class="px-5 py-3 rounded-xl border-2 border-slate-700 hover:border-slate-500 bg-slate-800/80 text-slate-200 font-black text-sm uppercase tracking-wider transition flex items-center gap-1.5">
-              <span>↺</span> <span>RESET</span>
-            </button>
-            <button id="hornManualBtn" type="button" title="Sound Buzzer Now" class="px-3.5 py-3 rounded-xl border-2 border-crimson-500/60 hover:bg-crimson-500/20 text-crimson-500 font-black text-sm transition">
-              📣
-            </button>
-          </div>
-
-          <!-- Auto-Advance Toggle Pill -->
-          <div class="mt-4 flex items-center justify-center">
-            <label class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-slate-700 bg-navy-950/80 cursor-pointer select-none text-xs font-bold uppercase tracking-wider text-slate-300 hover:border-gold-500/50 transition">
-              <input id="autoAdvanceCheckbox" type="checkbox" checked class="accent-gold-500 w-4 h-4 rounded" />
-              <span id="autoAdvanceLabelText">Auto-Advance on Timer End (10s Score View)</span>
-            </label>
-          </div>
-
-          <div class="mt-4 pt-3 border-t border-slate-800/90 flex items-center justify-between text-xs font-bold text-slate-400">
-            <span id="roundBottomLabel">ROUND 1 / 8</span>
-            <span id="expectedFinishLabel">Expected Finish: 11:00</span>
+          <div class="mt-3 pt-2.5 border-t border-slate-800/80 text-[11px] font-bold text-slate-400 italic">
+            Explain the "why" behind your shift to lock in new learning.
           </div>
         </div>
+
+        <!-- Center: Master Timer & Intermission Banner -->
+        <div class="lg:col-span-6 flex flex-col justify-center">
+          <div id="timerCard" class="w-full rounded-3xl border-2 border-slate-700/90 bg-navy-900/95 p-6 text-center shadow-2xl transition-all duration-300 relative overflow-hidden">
+            
+            <div class="flex items-center justify-center gap-2 mb-1">
+              <span id="livePhaseBadge" class="px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-navy-800 text-gold-400 border border-gold-500/40">
+                ROUND 1 / 8 (GROUPS)
+              </span>
+            </div>
+
+            <div id="mainTimerDisplay" class="timer-digits text-7xl sm:text-8xl font-extrabold text-white my-2 select-none">
+              04:00
+            </div>
+
+            <!-- Intermission Overlay Banner -->
+            <div id="intermissionBanner" class="hidden my-3 p-3.5 rounded-2xl bg-gold-500/20 border-2 border-gold-500 text-gold-400">
+              <div class="text-sm font-black uppercase tracking-widest">🔔 FULL TIME! SCORES LOCKED IN</div>
+              <div class="text-xs font-bold text-white mt-1">
+                Next game starts automatically in <span id="intermissionCountdown" class="text-base font-black text-gold-400 underline">10</span>s...
+              </div>
+            </div>
+
+            <!-- Timer Controls -->
+            <div class="flex items-center justify-center gap-3 mt-3">
+              <button id="playPauseBtn" type="button" class="px-7 py-3 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-sm uppercase tracking-widest shadow-lg transition flex items-center gap-2">
+                <span id="playPauseIcon">▶</span> <span id="playPauseText">START</span>
+              </button>
+              <button id="resetTimerBtn" type="button" class="px-5 py-3 rounded-xl border-2 border-slate-700 hover:border-slate-500 bg-slate-800/80 text-slate-200 font-black text-sm uppercase tracking-wider transition flex items-center gap-1.5">
+                <span>↺</span> <span>RESET</span>
+              </button>
+              <button id="hornManualBtn" type="button" title="Sound Buzzer Now" class="px-3.5 py-3 rounded-xl border-2 border-crimson-500/60 hover:bg-crimson-500/20 text-crimson-500 font-black text-sm transition">
+                📣
+              </button>
+            </div>
+
+            <!-- Auto-Advance Toggle Pill -->
+            <div class="mt-4 flex items-center justify-center">
+              <label class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-slate-700 bg-navy-950/80 cursor-pointer select-none text-xs font-bold uppercase tracking-wider text-slate-300 hover:border-gold-500/50 transition">
+                <input id="autoAdvanceCheckbox" type="checkbox" checked class="accent-gold-500 w-4 h-4 rounded" />
+                <span id="autoAdvanceLabelText">Auto-Advance on Timer End (10s Score View)</span>
+              </label>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800/90 flex items-center justify-between text-xs font-bold text-slate-400">
+              <span id="roundBottomLabel">ROUND 1 / 8</span>
+              <span id="expectedFinishLabel">Expected Finish: 11:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Claim, Support, Question -->
+        <div class="lg:col-span-3 rounded-3xl border-2 border-slate-800 bg-navy-900/90 p-5 shadow-xl flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-gold-500/15 text-gold-400 border border-gold-500/30">
+                Harvard Project Zero
+              </span>
+              <span class="text-base">🔍</span>
+            </div>
+            <h3 class="text-base sm:text-lg font-black uppercase tracking-wider text-white leading-snug">
+              Claim • Support •<br />
+              <span class="text-gold-400">Question</span>
+            </h3>
+            <p class="text-xs font-semibold text-slate-300 mt-2 leading-relaxed">
+              Don't just agree or disagree in your team huddle—reason with evidence from the match:
+            </p>
+            <ul class="mt-3 space-y-2 text-xs text-slate-200">
+              <li class="p-2 rounded-xl bg-navy-950/80 border border-slate-800">
+                <span class="font-black text-gold-400">1. Make a Claim:</span>
+                <span class="block text-[11px] text-slate-400">State an explanation for what worked or didn't work.</span>
+              </li>
+              <li class="p-2 rounded-xl bg-navy-950/80 border border-slate-800">
+                <span class="font-black text-gold-400">2. Give Support:</span>
+                <span class="block text-[11px] text-slate-400">What did you actually see, feel, or notice that proves it?</span>
+              </li>
+              <li class="p-2 rounded-xl bg-navy-950/80 border border-slate-800">
+                <span class="font-black text-gold-400">3. Ask a Question:</span>
+                <span class="block text-[11px] text-slate-400">What's still unexplained or needs testing next round?</span>
+              </li>
+            </ul>
+          </div>
+          <div class="mt-3 pt-2.5 border-t border-slate-800/80 text-[11px] font-bold text-slate-400 italic">
+            A great question is just as valuable as a strong claim!
+          </div>
+        </div>
+
       </div>
 
       <!-- ACTIVE COURTS SCOREBOARD GRID -->
