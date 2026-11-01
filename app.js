@@ -107,24 +107,45 @@ function playStartWhistle() {
   } catch (e) {}
 }
 
-function generateRoundRobinPairings(teams) {
+// Ensures every active team has a unique string name so standings & court packing never collide
+function getSanitizedActiveTeams() {
+  const seen = new Map();
+  return state.teamNames.slice(0, state.numTeams).map((raw, idx) => {
+    let base = (raw || "").trim() || `Team ${idx + 1}`;
+    if (!seen.has(base)) {
+      seen.set(base, 1);
+      return base;
+    } else {
+      const count = seen.get(base) + 1;
+      seen.set(base, count);
+      const uniqueName = `${base} (${count})`;
+      seen.set(uniqueName, 1);
+      return uniqueName;
+    }
+  });
+}
+
+// Returns an array of circle-method rounds, where each sub-array is a conflict-free set of pairings
+function generateRoundRobinSubRounds(teams) {
   const list = [...teams];
   if (list.length % 2 !== 0) list.push(null); // Bye for odd team counts
   const n = list.length;
   const numRounds = n - 1;
   const half = n / 2;
-  const pairings = [];
+  const subRounds = [];
 
   for (let r = 0; r < numRounds; r++) {
+    const roundPairings = [];
     for (let i = 0; i < half; i++) {
       const t1 = list[i];
       const t2 = list[n - 1 - i];
-      if (t1 !== null && t2 !== null) pairings.push({ teamA: t1, teamB: t2 });
+      if (t1 !== null && t2 !== null) roundPairings.push({ teamA: t1, teamB: t2 });
     }
+    subRounds.push(roundPairings);
     const last = list.pop();
     list.splice(1, 0, last);
   }
-  return pairings;
+  return subRounds;
 }
 
 function packMatchesIntoRounds(matchPool, numCourts) {
@@ -155,15 +176,14 @@ function packMatchesIntoRounds(matchPool, numCourts) {
 }
 
 function buildTournamentSchedule() {
-  const activeTeams = state.teamNames
-    .slice(0, state.numTeams)
-    .map((t, idx) => t.trim() || `Team ${idx + 1}`);
+  const activeTeams = getSanitizedActiveTeams();
   const numCourts = state.numCourts;
   let allRounds = [];
   let matchIdCounter = 1;
 
   if (state.format === "roundrobin") {
-    const rawPairings = generateRoundRobinPairings(activeTeams).map((p) => ({
+    const subRounds = generateRoundRobinSubRounds(activeTeams);
+    const rawPairings = subRounds.flat().map((p) => ({
       id: matchIdCounter++,
       stage: "LEAGUE",
       groupLabel: "League",
@@ -171,7 +191,8 @@ function buildTournamentSchedule() {
       teamB: p.teamB,
       scoreA: 0,
       scoreB: 0,
-      completed: false
+      completed: false,
+      edited: false
     }));
     allRounds = packMatchesIntoRounds(rawPairings, numCourts);
   } else {
@@ -180,36 +201,50 @@ function buildTournamentSchedule() {
     const groupA = activeTeams.slice(0, half);
     const groupB = activeTeams.slice(half);
 
-    const pairingsA = generateRoundRobinPairings(groupA).map((p) => ({
-      id: matchIdCounter++,
-      stage: "GROUP STAGE",
-      groupLabel: "Group A",
-      teamA: p.teamA,
-      teamB: p.teamB,
-      scoreA: 0,
-      scoreB: 0,
-      completed: false
-    }));
+    // Keep circle-method sub-rounds intact so parallelizable games within each group stay together
+    const subRoundsA = generateRoundRobinSubRounds(groupA).map((rnd) =>
+      rnd.map((p) => ({
+        id: matchIdCounter++,
+        stage: "GROUP STAGE",
+        groupLabel: "Group A",
+        teamA: p.teamA,
+        teamB: p.teamB,
+        scoreA: 0,
+        scoreB: 0,
+        completed: false,
+        edited: false
+      }))
+    );
 
-    const pairingsB = generateRoundRobinPairings(groupB).map((p) => ({
-      id: matchIdCounter++,
-      stage: "GROUP STAGE",
-      groupLabel: "Group B",
-      teamA: p.teamA,
-      teamB: p.teamB,
-      scoreA: 0,
-      scoreB: 0,
-      completed: false
-    }));
+    const subRoundsB = generateRoundRobinSubRounds(groupB).map((rnd) =>
+      rnd.map((p) => ({
+        id: matchIdCounter++,
+        stage: "GROUP STAGE",
+        groupLabel: "Group B",
+        teamA: p.teamA,
+        teamB: p.teamB,
+        scoreA: 0,
+        scoreB: 0,
+        completed: false,
+        edited: false
+      }))
+    );
 
-    const interleaved = [];
-    const maxLen = Math.max(pairingsA.length, pairingsB.length);
-    for (let i = 0; i < maxLen; i++) {
-      if (i < pairingsA.length) interleaved.push(pairingsA[i]);
-      if (i < pairingsB.length) interleaved.push(pairingsB[i]);
+    // Interleave sub-round by sub-round (preserving parallel pairs within Group A & Group B)
+    const orderedPool = [];
+    const maxSubRounds = Math.max(subRoundsA.length, subRoundsB.length);
+    for (let r = 0; r < maxSubRounds; r++) {
+      const rA = subRoundsA[r] || [];
+      const rB = subRoundsB[r] || [];
+      // Put the group with more matches in this sub-round first to maximize court packing
+      if (rA.length >= rB.length) {
+        orderedPool.push(...rA, ...rB);
+      } else {
+        orderedPool.push(...rB, ...rA);
+      }
     }
 
-    const groupRounds = packMatchesIntoRounds(interleaved, numCourts);
+    const groupRounds = packMatchesIntoRounds(orderedPool, numCourts);
 
     // Build Placement Finals based on how many pairs exist across Group A & Group B
     const maxCommonRank = Math.min(groupA.length, groupB.length);
@@ -225,17 +260,20 @@ function buildTournamentSchedule() {
 
     const finalsMatches = [];
     for (let r = maxCommonRank; r >= 1; r--) {
+      const defaultA = `${ordinal(r)} Group A`;
+      const defaultB = `${ordinal(r)} Group B`;
       finalsMatches.push({
         id: matchIdCounter++,
         stage: "FINALS",
         groupLabel: placementLabels[r] || `Rank ${r} Playoff`,
-        placeholderA: { group: "A", rank: r },
-        placeholderB: { group: "B", rank: r },
-        teamA: `${ordinal(r)} Group A`,
-        teamB: `${ordinal(r)} Group B`,
+        placeholderA: { group: "A", rank: r, defaultLabel: defaultA },
+        placeholderB: { group: "B", rank: r, defaultLabel: defaultB },
+        teamA: defaultA,
+        teamB: defaultB,
         scoreA: 0,
         scoreB: 0,
         completed: false,
+        edited: false,
         isFinal: true
       });
     }
@@ -269,8 +307,10 @@ function computeGroupStandings(teamList, groupFilterLabel = null) {
       if (groupFilterLabel && m.groupLabel !== groupFilterLabel) return;
       const isPlayed =
         m.completed ||
+        m.edited ||
         rIdx < state.currentRoundIndex ||
-        (rIdx === state.currentRoundIndex && (m.scoreA > 0 || m.scoreB > 0));
+        m.scoreA > 0 ||
+        m.scoreB > 0;
       if (!isPlayed) return;
 
       const stA = stats[m.teamA];
@@ -313,9 +353,7 @@ function computeGroupStandings(teamList, groupFilterLabel = null) {
 
 function updateFinalsSeedingIfReady() {
   if (state.format !== "groups") return;
-  const activeTeams = state.teamNames
-    .slice(0, state.numTeams)
-    .map((t, i) => t.trim() || `Team ${i + 1}`);
+  const activeTeams = getSanitizedActiveTeams();
   const half = Math.ceil(activeTeams.length / 2);
   const groupATeams = activeTeams.slice(0, half);
   const groupBTeams = activeTeams.slice(half);
@@ -323,16 +361,22 @@ function updateFinalsSeedingIfReady() {
   const standingsA = computeGroupStandings(groupATeams, "Group A");
   const standingsB = computeGroupStandings(groupBTeams, "Group B");
 
-  const anyGroupPlayed = standingsA.some((s) => s.P > 0) || standingsB.some((s) => s.P > 0);
-  if (!anyGroupPlayed) return;
+  const anyGroupAPlayed = standingsA.some((s) => s.P > 0);
+  const anyGroupBPlayed = standingsB.some((s) => s.P > 0);
 
   state.rounds.forEach((rnd) => {
     rnd.forEach((m) => {
       if (m.isFinal && m.placeholderA && m.placeholderB) {
         const rankA = m.placeholderA.rank - 1;
         const rankB = m.placeholderB.rank - 1;
-        if (standingsA[rankA]) m.teamA = `${standingsA[rankA].team}`;
-        if (standingsB[rankB]) m.teamB = `${standingsB[rankB].team}`;
+        m.teamA =
+          anyGroupAPlayed && standingsA[rankA]
+            ? standingsA[rankA].team
+            : m.placeholderA.defaultLabel;
+        m.teamB =
+          anyGroupBPlayed && standingsB[rankB]
+            ? standingsB[rankB].team
+            : m.placeholderB.defaultLabel;
       }
     });
   });
@@ -342,26 +386,29 @@ function calculateGameDurationSeconds(numRounds) {
   if (numRounds <= 0) return 240;
 
   if (state.timingMode === "manual") {
-    const mins = Math.max(0, parseInt(state.manualMinutes, 10) || 0);
-    const secs = Math.max(0, parseInt(state.manualSeconds, 10) || 0);
+    const parsedMin = parseInt(state.manualMinutes, 10);
+    const parsedSec = parseInt(state.manualSeconds, 10);
+    const mins = isNaN(parsedMin) ? 4 : Math.max(0, parsedMin);
+    const secs = isNaN(parsedSec) ? 0 : Math.max(0, parsedSec);
     return Math.max(15, mins * 60 + secs);
   }
 
   const now = new Date();
-  let startTotalMinutes = now.getHours() * 60 + now.getMinutes();
+  let startTotalSeconds =
+    now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
 
   if (state.startTimeMode === "custom" && state.customStartTime) {
     const [sh, sm] = state.customStartTime.split(":").map(Number);
-    if (!isNaN(sh) && !isNaN(sm)) startTotalMinutes = sh * 60 + sm;
+    if (!isNaN(sh) && !isNaN(sm)) startTotalSeconds = (sh * 60 + sm) * 60;
   }
 
-  let finishTotalMinutes = startTotalMinutes + 45;
+  let finishTotalSeconds = startTotalSeconds + 45 * 60;
   if (state.desiredFinishTime) {
     const [fh, fm] = state.desiredFinishTime.split(":").map(Number);
-    if (!isNaN(fh) && !isNaN(fm)) finishTotalMinutes = fh * 60 + fm;
+    if (!isNaN(fh) && !isNaN(fm)) finishTotalSeconds = (fh * 60 + fm) * 60;
   }
 
-  let diffSeconds = (finishTotalMinutes - startTotalMinutes) * 60;
+  let diffSeconds = finishTotalSeconds - startTotalSeconds;
   if (diffSeconds <= 0) diffSeconds += 24 * 3600;
 
   const totalIntermission = Math.max(0, numRounds - 1) * state.intermissionSeconds;
@@ -377,11 +424,17 @@ function formatMMSS(totalSec) {
 }
 
 function getExpectedFinishTimeString() {
-  const remainingRounds = state.rounds.length - state.currentRoundIndex - 1;
-  const remainingSec =
-    state.timeLeftSec +
-    Math.max(0, remainingRounds) * (state.gameDurationSec + state.intermissionSeconds);
-  const finishDate = new Date(Date.now() + remainingSec * 1000);
+  const remainingFutureRounds = Math.max(0, state.rounds.length - state.currentRoundIndex - 1);
+  const currentRoundRemainingSec = state.inIntermission
+    ? state.intermissionLeftSec
+    : state.timeLeftSec + (remainingFutureRounds > 0 ? state.intermissionSeconds : 0);
+
+  const futureRoundsSec =
+    remainingFutureRounds * state.gameDurationSec +
+    Math.max(0, remainingFutureRounds - 1) * state.intermissionSeconds;
+
+  const totalRemainingSec = currentRoundRemainingSec + futureRoundsSec;
+  const finishDate = new Date(Date.now() + totalRemainingSec * 1000);
   return `${String(finishDate.getHours()).padStart(2, "0")}:${String(finishDate.getMinutes()).padStart(2, "0")}`;
 }
 
@@ -410,7 +463,7 @@ function renderSetupView() {
     groupDesc.textContent =
       countA === countB
         ? `2 Groups of ${countA} + Placement Finals`
-        : `Group A (${countA}) & Group B (${countB}) + Finals`;
+        : `Group A (${countA}) & Group B (${countB}) + Top ${countB} Finals`;
   }
 
   document.querySelectorAll(".format-btn").forEach((btn) => {
@@ -519,6 +572,11 @@ function renderArenaView() {
   document.getElementById("livePhaseBadge").textContent = roundText;
   document.getElementById("roundBottomLabel").textContent = roundText;
   document.getElementById("expectedFinishLabel").textContent = `Expected Finish: ${getExpectedFinishTimeString()}`;
+
+  const autoAdvLabel = document.getElementById("autoAdvanceLabelText");
+  if (autoAdvLabel) {
+    autoAdvLabel.textContent = `Auto-Advance on Timer End (${state.intermissionSeconds}s Score View)`;
+  }
 
   document.getElementById("mainTimerDisplay").textContent = formatMMSS(state.timeLeftSec);
   document.getElementById("playPauseIcon").textContent = state.timerRunning ? "⏸" : "▶";
@@ -638,6 +696,7 @@ function adjustMatchScore(matchId, side, delta) {
       if (m.id === matchId) {
         if (side === "A") m.scoreA = Math.max(0, m.scoreA + delta);
         else m.scoreB = Math.max(0, m.scoreB + delta);
+        m.edited = m.scoreA > 0 || m.scoreB > 0;
       }
     });
   });
@@ -745,9 +804,7 @@ function createStandingsTableHTML(title, rows) {
 
 function renderStandingsTables() {
   const container = document.getElementById("standingsContainer");
-  const activeTeams = state.teamNames
-    .slice(0, state.numTeams)
-    .map((t, i) => t.trim() || `Team ${i + 1}`);
+  const activeTeams = getSanitizedActiveTeams();
 
   if (state.format === "roundrobin") {
     const standings = computeGroupStandings(activeTeams, null);
@@ -875,17 +932,20 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("manualMinutesInput").addEventListener("input", (e) => {
-    state.manualMinutes = parseInt(e.target.value, 10) || 1;
+    const val = parseInt(e.target.value, 10);
+    state.manualMinutes = isNaN(val) ? 0 : Math.max(0, val);
     renderSetupView();
   });
 
   document.getElementById("manualSecondsInput").addEventListener("input", (e) => {
-    state.manualSeconds = parseInt(e.target.value, 10) || 0;
+    const val = parseInt(e.target.value, 10);
+    state.manualSeconds = isNaN(val) ? 0 : Math.max(0, val);
     renderSetupView();
   });
 
   document.getElementById("intermissionSecInput").addEventListener("input", (e) => {
-    state.intermissionSeconds = Math.max(3, parseInt(e.target.value, 10) || 10);
+    const val = parseInt(e.target.value, 10);
+    state.intermissionSeconds = isNaN(val) ? 10 : Math.max(3, val);
     renderSetupView();
   });
 
