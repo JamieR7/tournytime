@@ -22,6 +22,8 @@ const state = {
   currentRoundIndex: 0,
   gameDurationSec: 240,
   timeLeftSec: 240,
+  roundFullDurationSec: 240, // Tracks whether the current round has already started ticking
+  targetFinishTimestampMs: null, // Locked-in real-world target finish timestamp
   timerRunning: false,
   inIntermission: false,
   intermissionLeftSec: 10,
@@ -107,7 +109,6 @@ function playStartWhistle() {
   } catch (e) {}
 }
 
-// Ensures every active team has a unique string name so standings & court packing never collide
 function getSanitizedActiveTeams() {
   const seen = new Map();
   return state.teamNames.slice(0, state.numTeams).map((raw, idx) => {
@@ -125,10 +126,9 @@ function getSanitizedActiveTeams() {
   });
 }
 
-// Returns an array of circle-method rounds, where each sub-array is a conflict-free set of pairings
 function generateRoundRobinSubRounds(teams) {
   const list = [...teams];
-  if (list.length % 2 !== 0) list.push(null); // Bye for odd team counts
+  if (list.length % 2 !== 0) list.push(null);
   const n = list.length;
   const numRounds = n - 1;
   const half = n / 2;
@@ -196,12 +196,10 @@ function buildTournamentSchedule() {
     }));
     allRounds = packMatchesIntoRounds(rawPairings, numCourts);
   } else {
-    // 2 Groups split (supports 4 to 12 teams, including odd numbers like 5, 7, 9, 11)
     const half = Math.ceil(activeTeams.length / 2);
     const groupA = activeTeams.slice(0, half);
     const groupB = activeTeams.slice(half);
 
-    // Keep circle-method sub-rounds intact so parallelizable games within each group stay together
     const subRoundsA = generateRoundRobinSubRounds(groupA).map((rnd) =>
       rnd.map((p) => ({
         id: matchIdCounter++,
@@ -230,13 +228,11 @@ function buildTournamentSchedule() {
       }))
     );
 
-    // Interleave sub-round by sub-round (preserving parallel pairs within Group A & Group B)
     const orderedPool = [];
     const maxSubRounds = Math.max(subRoundsA.length, subRoundsB.length);
     for (let r = 0; r < maxSubRounds; r++) {
       const rA = subRoundsA[r] || [];
       const rB = subRoundsB[r] || [];
-      // Put the group with more matches in this sub-round first to maximize court packing
       if (rA.length >= rB.length) {
         orderedPool.push(...rA, ...rB);
       } else {
@@ -246,7 +242,6 @@ function buildTournamentSchedule() {
 
     const groupRounds = packMatchesIntoRounds(orderedPool, numCourts);
 
-    // Build Placement Finals based on how many pairs exist across Group A & Group B
     const maxCommonRank = Math.min(groupA.length, groupB.length);
     const placementLabels = {
       6: "11th Place Playoff",
@@ -382,6 +377,41 @@ function updateFinalsSeedingIfReady() {
   });
 }
 
+// Computes the locked-in Date timestamp for the desired finish time
+function computeTargetFinishTimestampMs() {
+  const now = new Date();
+  let startSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  if (state.startTimeMode === "custom" && state.customStartTime) {
+    const [sh, sm] = state.customStartTime.split(":").map(Number);
+    if (!isNaN(sh) && !isNaN(sm)) startSec = (sh * 60 + sm) * 60;
+  }
+
+  let finishSec = startSec + 45 * 60;
+  if (state.desiredFinishTime) {
+    const [fh, fm] = state.desiredFinishTime.split(":").map(Number);
+    if (!isNaN(fh) && !isNaN(fm)) finishSec = (fh * 60 + fm) * 60;
+  }
+
+  let diffSec = finishSec - startSec;
+  if (diffSec <= 0) diffSec += 24 * 3600;
+
+  if (state.startTimeMode === "custom" && state.customStartTime) {
+    const [sh, sm] = state.customStartTime.split(":").map(Number);
+    const customStartDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      sh || 0,
+      sm || 0,
+      0,
+      0
+    );
+    return customStartDate.getTime() + diffSec * 1000;
+  }
+  return now.getTime() + diffSec * 1000;
+}
+
+// Used for Setup Preview and initial Round 1 calculation
 function calculateGameDurationSeconds(numRounds) {
   if (numRounds <= 0) return 240;
 
@@ -416,6 +446,36 @@ function calculateGameDurationSeconds(numRounds) {
   return Math.floor(availablePlaySeconds / numRounds);
 }
 
+// Dynamically recalculates gameDurationSec for remaining rounds so pauses/delays are absorbed
+function recalculateFutureGameDuration(includeCurrentRound = true) {
+  if (state.timingMode !== "finish" || !state.targetFinishTimestampMs) return;
+
+  const totalRounds = state.rounds.length;
+  const futureRoundsCount = Math.max(0, totalRounds - state.currentRoundIndex - 1);
+  const roundsToFit = includeCurrentRound ? futureRoundsCount + 1 : futureRoundsCount;
+
+  if (roundsToFit <= 0) return;
+
+  const nowMs = Date.now();
+  let remainingWindowSec = Math.floor((state.targetFinishTimestampMs - nowMs) / 1000);
+
+  if (!includeCurrentRound) {
+    // Subtract whatever time is left in the currently active round/intermission
+    const currentRem = state.inIntermission
+      ? state.intermissionLeftSec
+      : state.timeLeftSec + (futureRoundsCount > 0 ? state.intermissionSeconds : 0);
+    remainingWindowSec -= currentRem;
+  }
+
+  const intermissionsToFit = Math.max(0, roundsToFit - 1) * state.intermissionSeconds;
+  const availablePlaySec = Math.max(
+    roundsToFit * 25,
+    remainingWindowSec - intermissionsToFit
+  );
+
+  state.gameDurationSec = Math.floor(availablePlaySec / roundsToFit);
+}
+
 function formatMMSS(totalSec) {
   const s = Math.max(0, Math.floor(totalSec));
   const mins = Math.floor(s / 60);
@@ -425,17 +485,39 @@ function formatMMSS(totalSec) {
 
 function getExpectedFinishTimeString() {
   const remainingFutureRounds = Math.max(0, state.rounds.length - state.currentRoundIndex - 1);
+
+  // Preview what future rounds will be adjusted to if timingMode === 'finish'
+  let projectedFutureGameSec = state.gameDurationSec;
+  if (state.timingMode === "finish" && state.targetFinishTimestampMs && remainingFutureRounds > 0) {
+    const currentRem = state.inIntermission
+      ? state.intermissionLeftSec
+      : state.timeLeftSec + state.intermissionSeconds;
+    const remWindowAfterCurrent =
+      Math.floor((state.targetFinishTimestampMs - Date.now()) / 1000) - currentRem;
+    const futureIntermissions = Math.max(0, remainingFutureRounds - 1) * state.intermissionSeconds;
+    const availPlay = Math.max(
+      remainingFutureRounds * 25,
+      remWindowAfterCurrent - futureIntermissions
+    );
+    projectedFutureGameSec = Math.floor(availPlay / remainingFutureRounds);
+  }
+
   const currentRoundRemainingSec = state.inIntermission
     ? state.intermissionLeftSec
     : state.timeLeftSec + (remainingFutureRounds > 0 ? state.intermissionSeconds : 0);
 
   const futureRoundsSec =
-    remainingFutureRounds * state.gameDurationSec +
+    remainingFutureRounds * projectedFutureGameSec +
     Math.max(0, remainingFutureRounds - 1) * state.intermissionSeconds;
 
   const totalRemainingSec = currentRoundRemainingSec + futureRoundsSec;
   const finishDate = new Date(Date.now() + totalRemainingSec * 1000);
-  return `${String(finishDate.getHours()).padStart(2, "0")}:${String(finishDate.getMinutes()).padStart(2, "0")}`;
+  const finishStr = `${String(finishDate.getHours()).padStart(2, "0")}:${String(finishDate.getMinutes()).padStart(2, "0")}`;
+
+  if (state.timingMode === "finish" && remainingFutureRounds > 0) {
+    return `${finishStr} (Next Games: ${formatMMSS(projectedFutureGameSec)})`;
+  }
+  return finishStr;
 }
 
 function initSetupDefaults() {
@@ -873,7 +955,12 @@ function advanceToRound(targetIndex, autoStartClock = false) {
 
   state.currentRoundIndex = targetIndex;
   state.inIntermission = false;
+
+  // Dynamically recalculate duration for this round + all remaining rounds based on current clock
+  recalculateFutureGameDuration(true);
+
   state.timeLeftSec = state.gameDurationSec;
+  state.roundFullDurationSec = state.gameDurationSec;
   state.timerRunning = autoStartClock;
 
   if (autoStartClock) playStartWhistle();
@@ -969,10 +1056,19 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("startTournamentBtn").addEventListener("click", () => {
     ensureAudioContext();
     state.rounds = buildTournamentSchedule();
-    state.gameDurationSec = calculateGameDurationSeconds(state.rounds.length);
-    state.timeLeftSec = state.gameDurationSec;
+    state.targetFinishTimestampMs =
+      state.timingMode === "finish" ? computeTargetFinishTimestampMs() : null;
     state.currentRoundIndex = 0;
     state.inIntermission = false;
+
+    if (state.timingMode === "finish") {
+      recalculateFutureGameDuration(true);
+    } else {
+      state.gameDurationSec = calculateGameDurationSeconds(state.rounds.length);
+    }
+
+    state.timeLeftSec = state.gameDurationSec;
+    state.roundFullDurationSec = state.gameDurationSec;
     state.timerRunning = true;
 
     document.getElementById("setupView").classList.add("hidden");
@@ -993,14 +1089,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("playPauseBtn").addEventListener("click", () => {
     ensureAudioContext();
+    const wasPaused = !state.timerRunning;
     state.timerRunning = !state.timerRunning;
+
+    // If unpausing in 'finish' mode, recalculate future rounds (and current round if it hasn't started ticking yet)
+    if (wasPaused && state.timingMode === "finish" && !state.inIntermission) {
+      const roundHasNotTickedYet = state.timeLeftSec === state.roundFullDurationSec;
+      if (roundHasNotTickedYet) {
+        recalculateFutureGameDuration(true);
+        state.timeLeftSec = state.gameDurationSec;
+        state.roundFullDurationSec = state.gameDurationSec;
+      } else {
+        recalculateFutureGameDuration(false);
+      }
+    }
     renderArenaView();
   });
 
   document.getElementById("resetTimerBtn").addEventListener("click", () => {
     state.timerRunning = false;
     state.inIntermission = false;
+    if (state.timingMode === "finish") {
+      recalculateFutureGameDuration(true);
+    }
     state.timeLeftSec = state.gameDurationSec;
+    state.roundFullDurationSec = state.gameDurationSec;
     renderArenaView();
   });
 
